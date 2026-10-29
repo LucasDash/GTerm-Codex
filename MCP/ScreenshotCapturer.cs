@@ -153,7 +153,7 @@ namespace GTerm.MCP
         {
             try
             {
-                using Image<Rgb24> image = Image.Load<Rgb24>(frame);
+                using Image<Rgb24> image = ScreenshotFrame.Load(frame, screenW, screenH);
 
                 // Read these BEFORE the Mutate below: cropping and resizing change image.Width/Height
                 // in place, so afterwards they describe the output, not the screen.
@@ -223,7 +223,7 @@ namespace GTerm.MCP
 
             if (outW == width && outH == height) return (jpeg, 1.0, width, height);
 
-            using Image<Rgb24> image = Image.Load<Rgb24>(jpeg);
+            using Image<Rgb24> image = ScreenshotFrame.Load(jpeg, width, height);
             image.Mutate(c => c.Resize(new ResizeOptions
             {
                 Size = new Size(outW, outH),
