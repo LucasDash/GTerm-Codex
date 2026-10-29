@@ -11,10 +11,30 @@ namespace GTerm
     {
         private const string GMOD_ID = "4000";
         private static string? TargetRoot;
+        private static readonly string[] WINE_GMOD_PROCESS_NAMES = ["gmod_win64.exe", "gmod.exe"];
+
+        private static bool IsWineGmodProcess(Process process)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
+            try { return WINE_GMOD_PROCESS_NAMES.Contains(process.ProcessName, StringComparer.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+
+        private static string? GetGmodExecutablePath(Process process)
+        {
+            if (!IsWineGmodProcess(process)) return process.GetExecutablePath();
+            string? workingDirectory = process.GetWorkingDirectory();
+            return workingDirectory != null ? Path.Combine(workingDirectory, process.ProcessName) : null;
+        }
 
         private static Process? GetGmodProcess()
         {
-            if (TargetRoot == null) return Process.GetProcessesByName("gmod").FirstOrDefault();
+            if (TargetRoot == null)
+            {
+                Process? native = Process.GetProcessesByName("gmod").FirstOrDefault();
+                if (native != null || OperatingSystem.IsWindows()) return native;
+                return Process.GetProcesses().FirstOrDefault(IsWineGmodProcess);
+            }
             string[] names = ["srcds_console_win64", "srcds_win64", "srcds_console", "srcds", "gmod"];
             foreach (string name in names)
             {
@@ -193,7 +213,7 @@ namespace GTerm
                 Process? gmodProcess = GetGmodProcess();
                 if (gmodProcess != null)
                 {
-                    string? path = gmodProcess.GetExecutablePath()?.Replace('\\', '/');
+                    string? path = GetGmodExecutablePath(gmodProcess)?.Replace('\\', '/');
                     if (path != null)
                     {
                         if (toBin)
