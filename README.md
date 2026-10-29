@@ -111,6 +111,11 @@ capture workflow's expected format; they are not a substitute for updating
 vulnerable image libraries. A whole-frame JPEG is returned without full pixel
 decoding.
 
+GTerm logs MCP response sizes but omits their contents, including screenshot
+data and tool results. This does not make the log private: MCP request bodies,
+commands, game console output and diagnostic errors may still contain sensitive
+data, and MCP clients may retain the responses they receive.
+
 Every tool result is prefixed with a `[GTerm]` status line so the agent always knows the connection and realm state. When a precondition is not met (disconnected, wrong realm, no session), the tool returns an error explaining what to do rather than failing silently; pass `force: true` to attempt the call anyway.
 
 **Seeing what an agent is doing.** MCP clients show the tool name but usually not the arguments, so GTerm surfaces them itself: every tool call prints a magenta `[agent]` line in GTerm's console *before* it runs. Lua is shown in full on its own lines with Monokai syntax highlighting, and console commands are highlighted inline.
