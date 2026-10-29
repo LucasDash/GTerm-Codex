@@ -9,5 +9,7 @@
   "MCP": true,
   "MCPCollectionWindowMs": 1000,
   "MCPPort": 27513,
-  "MCPSecret": null
+  "MCPSecret": null,
+  "GmodRoot": null,
+  "ModulePort": 27514
 }

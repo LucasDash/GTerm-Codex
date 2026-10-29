@@ -25,6 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Config.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

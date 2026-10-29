@@ -24,6 +24,8 @@ namespace GTerm
         public bool SkipModule { get; set; }
         public bool SkipModuleUpdate { get; set; }
         public string? Realm { get; set; }
+        public string? GmodRoot { get; set; }
+        public int? ModulePort { get; set; }
 
         /// <summary>Tool packages the user accepted, written by GTerm itself (see MCP/ToolPackages.cs).</summary>
         public ToolPackageConsentEntry[]? ToolPackageConsent { get; set; }
@@ -71,6 +73,8 @@ namespace GTerm
         internal bool SkipModuleUpdate { get; set; } = false;
 
         internal ModuleRealm ModuleRealm { get; set; } = ModuleRealm.Server;
+        internal string? GmodRoot { get; set; }
+        internal int ModulePort { get; set; } = 27514;
 
         private static readonly object FileLock = new();
 
@@ -171,6 +175,10 @@ namespace GTerm
             this.SkipModule = cfg.SkipModule;
             this.SkipModuleUpdate = cfg.SkipModuleUpdate;
             this.ModuleRealm = ParseModuleRealm(cfg.Realm);
+            this.GmodRoot = cfg.GmodRoot;
+            this.ModulePort = cfg.ModulePort ?? 27514;
+            if (this.ModulePort < 1 || this.ModulePort > 65535)
+                throw new ArgumentOutOfRangeException(nameof(cfg.ModulePort), "ModulePort must be between 1 and 65535.");
 
             if (cfg.ExclusionPatterns != null)
             {
@@ -192,6 +200,8 @@ namespace GTerm
             LocalLogger.WriteLine("Skip module: " + this.SkipModule);
             LocalLogger.WriteLine("Skip module update: " + this.SkipModuleUpdate);
             LocalLogger.WriteLine("Module realm: " + this.ModuleRealm);
+            LocalLogger.WriteLine("Explicit GMod root: " + (this.GmodRoot ?? "(auto)"));
+            LocalLogger.WriteLine("Module TCP port: " + this.ModulePort);
             LocalLogger.WriteLine("Exclusion Patterns: \n", string.Join("\n", this.ExclusionPatterns.Select(r => r.ToString())));
         }
 
@@ -212,10 +222,10 @@ namespace GTerm
 
         private static Dictionary<string, List<string>> ParseCLIArgs(string[] args)
         {
-            args = args.Select(arg => arg.Trim().ToLower()).ToArray();
+            args = args.Select(arg => arg.Trim()).ToArray();
 
             List<string>? knownOptionParams = null;
-            Dictionary<string, List<string>> options = [];
+            Dictionary<string, List<string>> options = new(StringComparer.OrdinalIgnoreCase);
 
             string? curOption = null;
             List<string> curOptionParams = [];
@@ -232,7 +242,7 @@ namespace GTerm
                         }
                         else
                         {
-                            options.Add(curOption, curOptionParams);
+                            options.Add(curOption, new List<string>(curOptionParams));
                             curOptionParams.Clear();
                         }
                     }
@@ -269,10 +279,15 @@ namespace GTerm
 
                 switch (prop.PropertyType)
                 {
-                    case Type t when t == typeof(bool):
+                    case Type t when t == typeof(bool) || t == typeof(bool?):
                         bool value = true;
-                        if (option.Value.Count > 0 && int.TryParse(string.Join(' ', option.Value), out int parsedValue))
-                            value = parsedValue > 0;
+                        if (option.Value.Count > 0)
+                        {
+                            string raw = string.Join(' ', option.Value);
+                            if (bool.TryParse(raw, out bool parsedBool)) value = parsedBool;
+                            else if (int.TryParse(raw, out int parsedValue)) value = parsedValue > 0;
+                            else throw new ArgumentException($"Option --{option.Key} requires a boolean or integer.");
+                        }
 
                         prop.SetValue(curCfg, value);
                         break;
@@ -281,10 +296,9 @@ namespace GTerm
                         prop.SetValue(curCfg, option.Value.ToArray());
                         break;
 
-                    case Type t when t == typeof(int):
-                        int number = 0;
-                        if (option.Value.Count > 0 && int.TryParse(string.Join(' ', option.Value), out int parsedNumber))
-                            number = parsedNumber;
+                    case Type t when t == typeof(int) || t == typeof(int?):
+                        if (option.Value.Count == 0 || !int.TryParse(string.Join(' ', option.Value), out int number))
+                            throw new ArgumentException($"Option --{option.Key} requires an integer.");
                         prop.SetValue(curCfg, number);
                         break;
 

@@ -30,5 +30,18 @@ install or switch the owner's GMod client. The later GTerm server/module
 connection, port isolation, startup, and 64-bit client connection each require
 their own validation.
 
+For an explicitly managed dedicated server, configure `GmodRoot` as its
+absolute installation root and `ModulePort` as the native module's loopback
+port in GTerm's Config.json, or use `--gmodroot <path> --moduleport <port>`.
+The default module port is 27514; the server module must be configured for
+the same port. Set the server process's `GTERM_MODULE_PORT` environment
+variable to that decimal port before launching it; an unset variable uses
+27514, and an invalid value prevents the module from loading. Set this on the
+server process rather than globally when the player client uses the default.
+With an explicit root, GTerm resolves script and relay files
+only in that root and disables its automatic module/game-file installer.
+Stage the matching native module and server-side loader separately. The
+existing Steam client remains on its own installation and default port.
+
 References: [GMod dedicated server documentation](https://wiki.facepunch.com/gmod/Downloading_a_Dedicated_Server)
 and [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD).

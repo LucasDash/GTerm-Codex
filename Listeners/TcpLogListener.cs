@@ -11,8 +11,14 @@ namespace GTerm.Listeners
     internal class TcpLogListener : ILogListener
     {
         private const string HOST = "127.0.0.1";
-        private const int PORT = 27514;
         private const int RECONNECT_DELAY_MS = 1000;
+        private readonly int Port;
+
+        internal TcpLogListener(int port = 27514)
+        {
+            if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException(nameof(port));
+            this.Port = port;
+        }
 
         private TcpClient? Client;
         private NetworkStream? Stream;
@@ -74,7 +80,7 @@ namespace GTerm.Listeners
                 try
                 {
                     this.Client = new TcpClient();
-                    await this.Client.ConnectAsync(HOST, PORT);
+                    await this.Client.ConnectAsync(HOST, this.Port);
                     this.Stream = this.Client.GetStream();
                     this.SetConnectionStatus(true);
 
