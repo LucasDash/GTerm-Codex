@@ -109,7 +109,12 @@ Every tool result is prefixed with a `[GTerm]` status line so the agent always k
 
 ### MCP Tool packages (opt-in)
 
-Addons and servers can provide their own tools to the agent as Lua files at `lua/gterm_packages/<package>.lua`. GTerm discovers and loads packages with client-realm Lua (`sv_allowcslua` must be 1).
+Addons and servers can provide their own tools to the agent as Lua files at
+`lua/gterm_packages/<package>.lua`. GTerm normally discovers packages with
+client-realm Lua (`sv_allowcslua` must be 1). When connected directly to a
+local dedicated server, it discovers server-owned packages in the server
+realm and offers only their server-realm tools. That server uses a separate
+`local-dedicated` consent scope.
 
 Enabling is done manually in GTerm's console using `packages` in GTerm, or when the agent calls `request_tool_packages`. Consent is stored in `Config.json` under `ToolPackageConsent` per scope (server IPv4, or `local` for listen servers and singleplayer).
 

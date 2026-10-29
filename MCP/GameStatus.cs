@@ -57,15 +57,21 @@ namespace GTerm.MCP
         internal int? PlayerCount { get; init; }
         internal int? MaxPlayers { get; init; }
         internal bool? IsDedicated { get; init; }
+
+        /// <summary>True only when the local server realm itself reported a dedicated host.</summary>
+        internal bool HasLocalDedicatedServer { get; init; }
         internal bool? SinglePlayer { get; init; }
 
         /// <summary>IPv4 of the server the client is joined to, port dropped. Null when local (listen server, singleplayer) or unknown.</summary>
         internal string? ServerAddress { get; init; }
 
-        /// <summary>Consent scope: the server address, or "local".</summary>
-        internal string Scope => this.ServerAddress ?? "local";
+        /// <summary>Consent scopes distinguish a local dedicated host from client-discovered packages.</summary>
+        internal string Scope => this.UseDedicatedPackages ? "local-dedicated" : this.ServerAddress ?? "local";
 
-        /// <summary>Package names (lua/gterm_packages/{name}.lua) the client can see right now.</summary>
+        /// <summary>Use the server definition only for a directly reachable local dedicated server.</summary>
+        internal bool UseDedicatedPackages => this.HasLocalDedicatedServer && this.ServerRealm.IsUsable && !this.ClientRealm.IsUsable;
+
+        /// <summary>Package names offered by the active discovery realm.</summary>
         internal string[] OfferedPackages { get; init; } = [];
 
         internal RealmState ClientRealm { get; init; } = new();
