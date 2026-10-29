@@ -1,5 +1,8 @@
 # GTerm
 Garry's Mod external console software.
+
+This fork develops GTerm with assistance from OpenAI Codex. GTerm was created
+by Earu and remains available under its original MIT license; see [LICENSE](LICENSE).
 <img width="1113" height="1025" alt="WindowsTerminal_2025-12-21_19-19-37" src="https://github.com/user-attachments/assets/19e2ad2f-274b-4ce6-84a5-ac8cf027fc22" />
 <img width="1113" height="1025" alt="WindowsTerminal_2025-12-21_19-19-21" src="https://github.com/user-attachments/assets/b2ec6827-ef3b-49f1-9b7f-fbea110139cc" />
 <img width="1113" height="1025" alt="WindowsTerminal_2025-12-21_19-19-31" src="https://github.com/user-attachments/assets/d897eda9-5639-4564-8e94-b8c08d0faf34" />
@@ -19,6 +22,11 @@ Garry's Mod external console software.
 - Enjoy!
 
 *IMPORTANT NOTE: GTerm communicates with the gmod module over a localhost TCP socket (`127.0.0.1:27514`), so GTerm must run on the same host as the server. If you run your server inside a docker container or any other sandbox, run GTerm inside that same sandbox (or otherwise share the loopback interface).*
+
+For a separate Windows development-server installation using anonymous
+SteamCMD login, see [the isolated SteamCMD helper](tools/steamcmd/README.md).
+Preparing the dedicated server does not establish a GTerm connection or change
+the owner's installed client.
 
 ## In case GTerm does NOT detect your Garry's Mod CLIENT installation
 - Download the latest [release of `gterm`](https://github.com/Earu/GTerm/tree/master/prebuilt-bins).
