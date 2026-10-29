@@ -366,7 +366,7 @@ namespace GTerm.MCP
                 return new ScreenCaptureResult
                 {
                     Outcome = ScreenCaptureOutcome.Ok,
-                    Jpeg = await File.ReadAllBytesAsync(relayDisk, cancellationToken),
+                    Jpeg = await ScreenshotFrame.ReadRelayAsync(relayDisk, rectW, rectH, cancellationToken),
                     ScreenWidth = screenW,
                     ScreenHeight = screenH,
                     RectX = rectX,

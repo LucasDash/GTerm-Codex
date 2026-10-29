@@ -1720,7 +1720,9 @@ GTerm drives a running Garry's Mod through its console command buffer. Nothing w
             response.ContentLength64 = buffer.Length;
             response.StatusCode = 200;
 
-            LocalLogger.WriteLine($"MCP response: {json}");
+            // Responses may contain screenshots, chat, or arbitrary addon data. Log only
+            // the encoded size; the MCP client still receives the complete response.
+            LocalLogger.WriteLine($"MCP response: {buffer.Length} bytes (payload omitted)");
 
             await response.OutputStream.WriteAsync(buffer);
             response.Close();
@@ -1746,7 +1748,7 @@ GTerm drives a running Garry's Mod through its console command buffer. Nothing w
             response.ContentLength64 = buffer.Length;
             response.StatusCode = 200; // JSON-RPC errors still return 200
 
-            LocalLogger.WriteLine($"MCP error response: {json}");
+            LocalLogger.WriteLine($"MCP error response: {buffer.Length} bytes (payload omitted)");
 
             await response.OutputStream.WriteAsync(buffer);
             response.Close();

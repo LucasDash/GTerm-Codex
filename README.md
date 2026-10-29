@@ -98,10 +98,23 @@ GTerm includes an MCP (Model Context Protocol) server for AI agents such as Curs
 - `read_game_file` - Read a file's contents from the **running game's** virtual filesystem (mounted addons, Workshop GMAs), which the on-disk reader can't see
 - `take_screenshot_region` - Capture one rectangle of the screen and return it enlarged, so a HUD element, viewmodel or panel is actually legible. Preferred over the full-screen shot for anything specific
 - `take_screenshot` - Capture the whole screen. Last resort: prove things with Lua state and arithmetic first
+
 - `read_gmod_wiki` - Fetch a page from the Garry's Mod wiki (wiki.facepunch.com/gmod) to check a function's real signature before using it
 - `list_tool_packages` - Lists all the third party tools provided by addons in `lua/gterm_packages/*.lua` (see below)
 - `request_tool_packages` - Ask the user, in GTerm's own console, which packages to enable. The agent cannot choose by itself
 - `call_package_tool` - Run one tool from an enabled package with a JSON args object
+
+Screenshot relay files are restricted to JPEG, 64 MiB encoded data and
+67,108,864 pixels, with each dimension at most 16384 pixels. Reported
+capture dimensions must match the JPEG header. These checks limit input to the
+capture workflow's expected format; they are not a substitute for updating
+vulnerable image libraries. A whole-frame JPEG is returned without full pixel
+decoding.
+
+GTerm logs MCP response sizes but omits their contents, including screenshot
+data and tool results. This does not make the log private: MCP request bodies,
+commands, game console output and diagnostic errors may still contain sensitive
+data, and MCP clients may retain the responses they receive.
 
 Every tool result is prefixed with a `[GTerm]` status line so the agent always knows the connection and realm state. When a precondition is not met (disconnected, wrong realm, no session), the tool returns an error explaining what to do rather than failing silently; pass `force: true` to attempt the call anyway.
 
