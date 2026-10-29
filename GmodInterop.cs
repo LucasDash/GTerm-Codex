@@ -10,9 +10,37 @@ namespace GTerm
     internal class GmodInterop
     {
         private const string GMOD_ID = "4000";
+        private static string? TargetRoot;
 
         private static Process? GetGmodProcess()
-            => Process.GetProcessesByName("gmod").FirstOrDefault();
+        {
+            if (TargetRoot == null) return Process.GetProcessesByName("gmod").FirstOrDefault();
+            string[] names = ["srcds_console_win64", "srcds_win64", "srcds_console", "srcds", "gmod"];
+            foreach (string name in names)
+            {
+                foreach (Process process in Process.GetProcessesByName(name))
+                {
+                    string? executable = process.GetExecutablePath();
+                    if (executable != null && Path.GetDirectoryName(executable)?.Equals(
+                        TargetRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) == true)
+                        return process;
+                    process.Dispose();
+                }
+            }
+            return null;
+        }
+
+        /// <summary>Select an explicitly managed server root. Invalid explicit roots never fall back to Steam.</summary>
+        internal static void ConfigureTargetRoot(string? root)
+        {
+            if (root == null) { TargetRoot = null; return; }
+            if (string.IsNullOrWhiteSpace(root) || !Path.IsPathFullyQualified(root))
+                throw new ArgumentException("GmodRoot must be an absolute dedicated-server root.");
+            string fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            if (!File.Exists(Path.Combine(fullPath, "garrysmod", "lua", "includes", "init.lua")))
+                throw new ArgumentException("GmodRoot must contain garrysmod/lua/includes/init.lua.");
+            TargetRoot = fullPath;
+        }
 
         /// <summary>
         /// Whether Garry's Mod is running at all. Distinguishes "not launched" from "launched but the
@@ -140,6 +168,25 @@ namespace GTerm
         {
             try
             {
+                if (TargetRoot != null)
+                {
+                    if (!File.Exists(Path.Combine(TargetRoot, "garrysmod", "lua", "includes", "init.lua")))
+                    {
+                        gmodPath = string.Empty;
+                        return false;
+                    }
+                    if (!toBin) { gmodPath = TargetRoot; return true; }
+                    string[] names = OperatingSystem.IsWindows()
+                        ? ["srcds_console_win64.exe", "srcds_win64.exe", "srcds_console.exe", "srcds.exe", "bin/win64/gmod.exe", "gmod.exe"]
+                        : ["srcds_run", "srcds", "gmod"];
+                    foreach (string name in names)
+                    {
+                        string candidate = Path.Combine(TargetRoot, name);
+                        if (File.Exists(candidate)) { gmodPath = candidate; return true; }
+                    }
+                    gmodPath = string.Empty;
+                    return false;
+                }
                 // push this in priority
                 // fallback for installations from steamcmd and other weird things
                 // this will require gmod restart
@@ -302,6 +349,12 @@ namespace GTerm
         {
             bool modifiedGameFiles = false;
             bool success = false;
+
+            if (TargetRoot != null)
+            {
+                LocalLogger.WriteLine("Explicit server root: automatic module and game-file installation is disabled.");
+                return (true, false);
+            }
 
             if (!TryGetGmodPath(out string baseGmodPath, false)) return (success, modifiedGameFiles);
 

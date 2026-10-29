@@ -226,8 +226,8 @@ namespace GTerm.MCP
             if (status.State != GameConnState.Live)
                 return new PackageError { Message = "No Lua realm is responding (main menu, loading, or never probed). Call get_game_status, then retry." };
 
-            if (!status.ClientRealm.IsUsable)
-                return new PackageError { Message = $"The client Lua realm is not usable ({status.ClientRealm}). Packages are discovered and loaded through client Lua, so sv_allowcslua must be 1." };
+            if (!status.ClientRealm.IsUsable && !status.UseDedicatedPackages)
+                return new PackageError { Message = $"The client Lua realm is not usable ({status.ClientRealm}). Client packages require sv_allowcslua 1; only a directly connected dedicated server can offer server-owned packages." };
 
             return null;
         }
@@ -288,13 +288,13 @@ namespace GTerm.MCP
         private static string PackagePath(string name) => PackageDir + name + ".lua";
 
         /// <summary>
-        /// Compiles and runs the package file in the client realm, and relays a JSON copy of its
+        /// Compiles and runs the package file in the discovery realm, and relays a JSON copy of its
         /// definition (everything except the run functions) plus the bytecode hash.
         /// </summary>
-        internal async Task<(PackageManifest? manifest, string? problem)> FetchManifestAsync(string name, CancellationToken cancellationToken = default)
+        internal async Task<(PackageManifest? manifest, string? problem)> FetchManifestAsync(string name, GameStatus status, CancellationToken cancellationToken = default)
         {
             RelayResult relay = await this.Executor.RunWithRelayAsync(
-                relayRel => BuildDescribe(name, relayRel), LuaRealm.Client, MaxManifestBytes, cancellationToken: cancellationToken);
+                relayRel => BuildDescribe(name, relayRel), status.UseDedicatedPackages ? LuaRealm.Server : LuaRealm.Client, MaxManifestBytes, cancellationToken: cancellationToken);
 
             switch (relay.Outcome)
             {
@@ -302,7 +302,7 @@ namespace GTerm.MCP
                     return (null, relay.Error ?? "loading the package failed");
 
                 case RelayOutcome.NotExecuted:
-                    return (null, "the client realm never ran the package loader (sv_allowcslua is probably 0)");
+                    return (null, status.UseDedicatedPackages ? "the dedicated server realm never ran the package loader" : "the client realm never ran the package loader (sv_allowcslua is probably 0)");
 
                 case RelayOutcome.Refused:
                     return (null, relay.Error ?? "the package could not be loaded");
@@ -312,7 +312,19 @@ namespace GTerm.MCP
                 return (null, $"definition larger than {MaxManifestBytes / 1024} KB");
 
             string? problem = TryParseDefinition(name, relay.Content ?? "", out PackageManifest? manifest);
-            return problem != null ? (null, problem) : (manifest, null);
+            if (problem != null || manifest == null) return (null, problem);
+            return RestrictForStatus(manifest, status);
+        }
+
+        internal static (PackageManifest? manifest, string? problem) RestrictForStatus(PackageManifest manifest, GameStatus status)
+        {
+            if (!status.UseDedicatedPackages) return (manifest, null);
+            // Keep the full file hash for consent and every invocation, while advertising only
+            // the tools available in this headless process.
+            PackageToolDef[] serverTools = manifest.Tools.Where(t => t.Realm == LuaRealm.Server).ToArray();
+            if (serverTools.Length == 0) return (null, "the package has no server-realm tools");
+            return (manifest with { Tools = serverTools,
+                Description = (manifest.Description ?? "") + " [Dedicated server: server-realm tools only.]" }, null);
         }
 
         private static string BuildDescribe(string name, string relayRel)
@@ -514,7 +526,7 @@ namespace GTerm.MCP
             foreach (string name in status.OfferedPackages)
             {
                 if (rows.Any(r => r.manifest.Name == name)) continue;
-                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, cancellationToken);
+                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, status, cancellationToken);
                 problem ??= manifest == null ? null : BindingProblem(manifest, status);
                 if (manifest == null || problem != null) { unusable.Add((name, problem ?? "unreadable")); continue; }
                 rows.Add((manifest, false));
@@ -584,7 +596,7 @@ namespace GTerm.MCP
                 // Cheap pre-filter: no remembered entry at all for this scope+package means no read.
                 if (!HasAnyConsent(status.Scope, name)) continue;
 
-                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, cancellationToken);
+                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, status, cancellationToken);
                 if (manifest == null)
                 {
                     LocalLogger.WriteLine($"Tool package '{name}' not auto-enabled: {problem}");
@@ -632,7 +644,7 @@ namespace GTerm.MCP
                     continue;
                 }
 
-                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, cancellationToken);
+                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, status, cancellationToken);
                 problem ??= manifest == null ? null : BindingProblem(manifest, status);
 
                 listings.Add(new PackageListing
@@ -675,7 +687,7 @@ namespace GTerm.MCP
                     if (this.Current.ContainsKey(name)) continue;
                 }
 
-                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, cancellationToken);
+                (PackageManifest? manifest, string? problem) = await FetchManifestAsync(name, status, cancellationToken);
                 problem ??= manifest == null ? null : BindingProblem(manifest, status);
                 if (manifest == null || problem != null)
                 {

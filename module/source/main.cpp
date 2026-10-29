@@ -12,12 +12,14 @@
 #include <cstring>
 #include <cstdint>
 #include <cerrno>
+#include <cstdlib>
 #include <string>
 #include <thread>
 #include <chrono>
 #include <atomic>
 #include <mutex>
 #include <vector>
+#include "PortConfig.h"
 
 #include <GarrysMod/Lua/Interface.h>
 #include <GarrysMod/FactoryLoader.hpp>
@@ -78,10 +80,25 @@ typedef int socket_t;
 #define CloseSocket(s) close(s)
 #endif
 
-// GTerm always talks over a localhost TCP socket. The module is the server: it
-// listens on this port and GTerm connects as a client.
-static const uint16_t GTERM_PORT = 27514;
+// A per-process override lets a dedicated server and a local player coexist.
+static const uint16_t GTERM_DEFAULT_PORT = 27514;
 static const char* GTERM_HOST = "127.0.0.1";
+
+static bool GetGTermModulePort(uint16_t& port)
+{
+    port = GTERM_DEFAULT_PORT;
+#ifdef _WIN32
+    char value[6];
+    SetLastError(ERROR_SUCCESS);
+    const DWORD length = GetEnvironmentVariableA("GTERM_MODULE_PORT", value, sizeof(value));
+    if (length == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) return true;
+    if (length == 0 || length >= sizeof(value)) return false;
+    return ParseGTermModulePort(value, port);
+#else
+    const char* value = std::getenv("GTERM_MODULE_PORT");
+    return value ? ParseGTermModulePort(value, port) : true;
+#endif
+}
 
 static socket_t listenSocket = INVALID_SOCKET_VALUE;
 static std::atomic<socket_t> clientSocket{ INVALID_SOCKET_VALUE };
@@ -318,6 +335,12 @@ static void ServerThread()
 
 GMOD_MODULE_OPEN()
 {
+    uint16_t modulePort;
+    if (!GetGTermModulePort(modulePort))
+    {
+        LUA->ThrowError("GTERM_MODULE_PORT must be a decimal port between 1 and 65535");
+        return 0;
+    }
 	{
 		SourceSDK::ModuleLoader tier0("tier0");
 		useLoggingSystem = ResolveLoggingSystem(tier0);
@@ -356,7 +379,7 @@ GMOD_MODULE_OPEN()
 	sockaddr_in addr;
 	std::memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(GTERM_PORT);
+	addr.sin_port = htons(modulePort);
 	inet_pton(AF_INET, GTERM_HOST, &addr.sin_addr);
 
 	if (bind(listenSocket, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)

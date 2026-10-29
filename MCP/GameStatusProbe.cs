@@ -24,8 +24,9 @@ namespace GTerm.MCP
             RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
         private static readonly string ServerProbeCommand =
-            "lua_run " + GTermSentinels.LuaEmit(GTermSentinels.Status,
-                "util.TableToJSON({m=game.GetMap(),g=engine.ActiveGamemode(),mp=game.MaxPlayers(),pc=player.GetCount(),d=game.IsDedicated(),sp=game.SinglePlayer()})");
+            "lua_run local a,b=file.Find(\"gterm_packages/*.lua\",\"LUA\"),file.Find(\"lua/gterm_packages/*.lua\",\"GAME\") "
+            + GTermSentinels.LuaEmit(GTermSentinels.Status,
+                "util.TableToJSON({m=game.GetMap(),g=engine.ActiveGamemode(),mp=game.MaxPlayers(),pc=player.GetCount(),d=game.IsDedicated(),sp=game.SinglePlayer(),pk=a,pg=b})");
 
         // Everything here is available client-side, so the client probe alone fully describes the
         // session even when we are a client on a remote server and the server realm is unreachable.
@@ -161,8 +162,8 @@ namespace GTerm.MCP
 
                 // Scope change: a different server, or server <-> local. Only meaningful when the
                 // previous snapshot actually described a session.
-                if (previous.State == GameConnState.Live && status.State == GameConnState.Live && previous.ServerAddress != status.ServerAddress)
-                    this.SessionInvalidated?.Invoke($"scope changed from {previous.ServerAddress ?? "local"} to {status.ServerAddress ?? "local"}");
+                if (previous.State == GameConnState.Live && status.State == GameConnState.Live && previous.Scope != status.Scope)
+                    this.SessionInvalidated?.Invoke($"scope changed from {previous.Scope} to {status.Scope}");
 
                 return status;
             }
@@ -260,9 +261,12 @@ namespace GTerm.MCP
                 PlayerCount = sv?["pc"]?.Value<int>() ?? cl?["pc"]?.Value<int>(),
                 MaxPlayers = sv?["mp"]?.Value<int>() ?? cl?["mp"]?.Value<int>(),
                 IsDedicated = isDedicated,
+                HasLocalDedicatedServer = serverOk && sv?["d"]?.Value<bool>() == true,
                 SinglePlayer = sv?["sp"]?.Value<bool>(),
                 ServerAddress = serverAddress,
-                OfferedPackages = clientOk ? packages : [],
+                OfferedPackages = clientOk ? packages
+                    : serverOk && sv?["d"]?.Value<bool>() == true
+                        ? ToolPackages.SanitizePackageNames(sv?["pk"] as JArray, sv?["pg"] as JArray) : [],
                 ClientRealm = clientRealm,
                 ServerRealm = serverRealm,
             };
@@ -319,6 +323,7 @@ namespace GTerm.MCP
             PlayerCount = source.PlayerCount,
             MaxPlayers = source.MaxPlayers,
             IsDedicated = source.IsDedicated,
+            HasLocalDedicatedServer = source.HasLocalDedicatedServer,
             SinglePlayer = source.SinglePlayer,
             ServerAddress = source.ServerAddress,
             OfferedPackages = source.OfferedPackages,

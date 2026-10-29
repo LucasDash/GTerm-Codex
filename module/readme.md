@@ -1,6 +1,9 @@
 # gmsv\_gterm
 A Garry's Mod module that provides an interface for external consoles (used by [GTerm](https://github.com/Earu/GTerm)).
-It exposes the server console over a localhost TCP socket (`127.0.0.1:27514`); GTerm connects to it as a client.
+It exposes the server console over a localhost TCP socket. The default port
+is 27514; set the game process's `GTERM_MODULE_PORT` to a decimal port from 1
+to 65535 to use a different port. Configure GTerm's `ModulePort` to match.
+GTerm connects to the module as a client.
 **This fork provides both x86 and x64 compatible versions.**
 
 ## Compiling

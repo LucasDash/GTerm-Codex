@@ -26,7 +26,7 @@ namespace GTerm
         private static readonly StringBuilder InputBuffer = new();
         private static readonly Thread UserInputThread = new(ProcessUserInput);
 
-        private static readonly ILogListener Listener = new TcpLogListener();
+        private static ILogListener Listener = null!;
 
         private static string ArchivePath = string.Empty;
         private static Config Config = new();
@@ -51,6 +51,8 @@ namespace GTerm
             Console.Title = "GTerm";
 
             Config = new Config(args);
+            GmodInterop.ConfigureTargetRoot(Config.GmodRoot);
+            Listener = new TcpLogListener(Config.ModulePort);
 
             Process? parent = curProc.GetParent();
             LocalLogger.WriteLine($"Parent process: {parent?.ProcessName}");
