@@ -129,7 +129,11 @@ local dedicated server, it discovers server-owned packages in the server
 realm and offers only their server-realm tools. That server uses a separate
 `local-dedicated` consent scope.
 
-Enabling is done manually in GTerm's console using `packages` in GTerm, or when the agent calls `request_tool_packages`. Consent is stored in `Config.json` under `ToolPackageConsent` per scope (server IPv4, or `local` for listen servers and singleplayer).
+Enabling is done manually in GTerm's console using `packages` in GTerm, or when the agent calls `request_tool_packages`. Consent is stored in `Config.json` next to the running GTerm executable, keyed by scope, package name and the package file's compiled-bytecode hash. The same accepted package is restored automatically when those values match; a changed package or scope requires another decision. Client-discovered remote packages use the server IPv4, listen servers and singleplayer use `local`, and a directly connected dedicated server uses `local-dedicated`. Each GTerm executable directory has its own configuration and remembered choices.
+
+Build and publish seed `Config.json` only when the destination does not already have one, preserving settings and remembered consent across rebuilds. To check this with a disposable project and synthetic configuration, run `pwsh -NoProfile -File tests/ConfigPreservation.Tests.ps1`. Keep runtime configuration and secrets out of commits.
+
+The hash covers the package file's compiled chunk, not helper files, global APIs or the identity of a remote server. Package discovery currently executes the package's top-level Lua to read its definition before asking for consent. Consent controls package-tool use; it is not a Lua sandbox. Use package discovery only in sessions whose addon code you trust.
 
 The file returns a table: optional `description`, optional `server` (IPv4; only usable on that server), and `tools`. Each tool has `name` (`[a-z][a-z0-9_]*`), `description`, `inputSchema` (JSON schema, `type = "object"`), optional `realm` (`"client"`, the default, or `"server"`), and `run(args)`. Its return value (string or table) comes back as the result, capped at 4096 characters by `print`. Limits: 32 tools, 512-character descriptions, 8 KB input schema, 256 KB definition. Package names: `[a-z0-9][a-z0-9_-]{0,63}`.
 
