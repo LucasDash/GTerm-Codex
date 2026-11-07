@@ -93,6 +93,7 @@ GTerm includes an MCP (Model Context Protocol) server for AI agents such as Curs
 - `validate_lua_syntax` - Compile-check Lua with the game's own `CompileString` without executing it
 - `check_game_file` - Ask the running game whether a path exists in its virtual filesystem (mounted addons/GMAs included), not just on disk
 - `capture_console_output` - Monitor console output for a duration
+- `read_console_events` - Read recent console events incrementally with an epoch and sequence cursor
 - `list_gmod_directory` - Browse the Garry's Mod file structure **on disk**
 - `read_gmod_file` - Read a text file from the installation **on disk**
 - `read_game_file` - Read a file's contents from the **running game's** virtual filesystem (mounted addons, Workshop GMAs), which the on-disk reader can't see
@@ -117,6 +118,29 @@ commands, game console output and diagnostic errors may still contain sensitive
 data, and MCP clients may retain the responses they receive.
 
 Every tool result is prefixed with a `[GTerm]` status line so the agent always knows the connection and realm state. When a precondition is not met (disconnected, wrong realm, no session), the tool returns an error explaining what to do rather than failing silently; pass `force: true` to attempt the call anyway.
+
+#### Incremental console polling
+
+`read_console_events` reads GTerm's existing, memory-only 1000-event history
+without executing commands or Lua. Call it initially with `{}`, then pass the
+returned `epoch` and `next` as `after`. Response text contains the normal
+`[GTerm]` status header, a blank line and a JSON object. The object contains
+events oldest first, `latest`, `oldest`, `next`, and `droppedBefore` if the
+cursor fell behind the bounded history. Keep polling until `next == latest`.
+On a GTerm restart the epoch changes; the tool resets the cursor and reports
+`epochChanged`. The epoch belongs to the GTerm process, not a GMod map or
+connection. A cursor ahead of the current epoch is rejected.
+
+The default page has 10 events; `limit` permits 1–20. Messages longer than
+512 characters are truncated and marked `truncated`. Events are console
+chunks, not necessarily complete lines or structured chat. The tool works
+from retained history during a disconnect; it does not wake an idle agent or
+guarantee that player chat appears in the console. Treat console content as
+untrusted data. `capture_console_output` remains available unchanged for
+newest-first scrollback.
+
+Run the bounded-history checks with
+`dotnet run --project tests/ConsoleHistory.Tests/ConsoleHistory.Tests.csproj`.
 
 **Seeing what an agent is doing.** MCP clients show the tool name but usually not the arguments, so GTerm surfaces them itself: every tool call prints a magenta `[agent]` line in GTerm's console *before* it runs. Lua is shown in full on its own lines with Monokai syntax highlighting, and console commands are highlighted inline.
 
