@@ -1,0 +1,44 @@
+name: Dedicated server installation check
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Garry''s Mod dedicated-server branch'
+        required: true
+        type: choice
+        default: x86-64
+        options:
+          - x86-64
+          - public
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Install app 4020 in a disposable runner
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out GTerm
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install SteamCMD
+        id: steamcmd
+        uses: andriivitiv/setup-steamcmd@afc45f145b95c175c3a3862d3ca84756537d48e8 # v1.3.0
+      - name: Install and validate the dedicated server
+        shell: pwsh
+        env:
+          STEAMCMD_EXECUTABLE: ${{ steps.steamcmd.outputs.executable }}
+          SERVER_BRANCH: ${{ inputs.branch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SERVER_BRANCH -notin @('x86-64', 'public')) {
+            throw 'Unsupported dedicated-server branch.'
+          }
+          $serverRoot = Join-Path $env:RUNNER_TEMP 'gterm-gmod-server'
+          & ./tools/steamcmd/Invoke-GmodServer.ps1 -Action InstallOrUpdate `
+            -SteamCmdPath $env:STEAMCMD_EXECUTABLE -ServerRoot $serverRoot `
+            -Branch $env:SERVER_BRANCH

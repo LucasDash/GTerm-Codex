@@ -132,13 +132,18 @@ Dedicated Servers](https://wiki.facepunch.com/gmod/Workshop_for_Dedicated_Server
 [`resource.AddWorkshop`](https://wiki.facepunch.com/gmod/resource.AddWorkshop),
 and [Serving Content](https://wiki.facepunch.com/gmod/Serving_Content).
 
-The optional third-party [Setup SteamCMD GitHub Action](https://github.com/marketplace/actions/setup-steamcmd)
-installs SteamCMD on a GitHub Actions runner; it does not itself install app
-4020 or provide a persistent server. A manually triggered CI job can use the
-Action and then the anonymous SteamCMD command, with the runner's own disposable
-directory. Review and pin third-party action versions as appropriate. Do not
-run multi-gigabyte server downloads on every push or upload server files,
-Workshop content, runtime configuration or secrets as public build artifacts.
+The manually dispatched `Dedicated server installation check` workflow uses a
+commit-pinned third-party [Setup SteamCMD GitHub Action](https://github.com/marketplace/actions/setup-steamcmd)
+on a disposable GitHub-hosted Windows runner, then invokes the same SteamCMD
+helper above for app 4020 using anonymous login. Choose `x86-64` or `public`
+when dispatching it; the app ID and runner-local destination are fixed.
+The workflow runs only on manual dispatch, can download several gigabytes, and
+does not upload server files, create a persistent server, mount Workshop addons,
+start the server or test GTerm. GitHub requires a workflow file on the default
+branch before it is available for manual dispatch; once available, select the
+desired branch containing the workflow in the Actions UI. The third-party
+action downloads and runs SteamCMD before our helper checks its signature.
+Treat hosted-runner CI as a separate check from your local server setup.
 
 ## Image processing
 

@@ -9,12 +9,12 @@ Supply a signed Valve SteamCMD executable and an empty server directory:
 
 ```powershell
 ./tools/steamcmd/Invoke-GmodServer.ps1 -Action Inspect `
-  -SteamCmdPath 'D:\GMod-Agent-Lab\steamcmd\steamcmd.exe' `
-  -ServerRoot 'D:\GMod-Agent-Lab\server-x64' -Branch x86-64
+  -SteamCmdPath 'D:\SteamCMD\steamcmd.exe' `
+  -ServerRoot 'D:\GModServers\development' -Branch x86-64
 
 ./tools/steamcmd/Invoke-GmodServer.ps1 -Action InstallOrUpdate `
-  -SteamCmdPath 'D:\GMod-Agent-Lab\steamcmd\steamcmd.exe' `
-  -ServerRoot 'D:\GMod-Agent-Lab\server-x64' -Branch x86-64
+  -SteamCmdPath 'D:\SteamCMD\steamcmd.exe' `
+  -ServerRoot 'D:\GModServers\development' -Branch x86-64
 ```
 
 The helper validates that SteamCMD is signed, rejects server paths containing
