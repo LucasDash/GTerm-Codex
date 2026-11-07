@@ -50,7 +50,7 @@ namespace GTerm
                 return null;
             }
 
-            string[] names = ["srcds_console_win64", "srcds_win64", "srcds_console", "srcds", "gmod"]
+            string[] names = new[] { "srcds_console_win64", "srcds_win64", "srcds_console", "srcds", "gmod" }
                 .Concat(WINE_GMOD_PROCESS_NAMES)
                 .ToArray();
             foreach (string name in names)

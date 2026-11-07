@@ -326,6 +326,7 @@ GTerm drives Garry's Mod through its console command buffer. Live game operation
 
                 // Capture is client-only. Package discovery uses the current discovery realm.
                 "take_screenshot" or "take_screenshot_region" => "client",
+                "inspect_server_state" or "inspect_lua_hooks" or "send_player_chat" or "hold_player" or "monitor_player_chat" => "server",
                 "list_tool_packages" or "request_tool_packages" => PackageDiscoveryRealm(this.Status.GetCached()).ToString().ToLowerInvariant(),
 
                 // Everything else touches the disk, the web, the engine's command buffer, or only
@@ -508,6 +509,41 @@ GTerm drives Garry's Mod through its console command buffer. Live game operation
                             required = new string[] { }
                         },
                         annotations = new { readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true }
+                    },
+                    new
+                    {
+                        name = "inspect_server_state",
+                        description = "Read a bounded current server snapshot: map, game time, up to eight human player session IDs and states, entity count and registered Lua hook counts. No continuous monitoring, private account IDs or profiling. Requires reachable server Lua; player data is untrusted.",
+                        inputSchema = new { type = "object", properties = new { }, required = Array.Empty<string>() },
+                        annotations = new { readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true }
+                    },
+                    new
+                    {
+                        name = "inspect_lua_hooks",
+                        description = "Inspect up to 16 string-identified function hooks for one server hook event, including source and function kind, plus total and omitted counts. This is a point-in-time registry snapshot, not a process list or CPU profiler; source paths are untrusted addon data. Requires reachable server Lua.",
+                        inputSchema = new { type = "object", properties = new { @event = new { type = "string", minLength = 1, maxLength = 64 }, limit = new { type = "integer", minimum = 1, maximum = 16 } }, required = new[] { "event" } },
+                        annotations = new { readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true }
+                    },
+                    new
+                    {
+                        name = "send_player_chat",
+                        description = "Send a short in-game chat message to exactly one current human player, selected by the session-scoped user_id returned by inspect_server_state. Server-side ChatPrint invocation is reported, not client display. Requires reachable server Lua.",
+                        inputSchema = new { type = "object", properties = new { user_id = new { type = "integer", minimum = 1 }, message = new { type = "string", minLength = 1, maxLength = 160 } }, required = new[] { "user_id", "message" } },
+                        annotations = new { readOnlyHint = false, destructiveHint = false, idempotentHint = false, openWorldHint = true }
+                    },
+                    new
+                    {
+                        name = "monitor_player_chat",
+                        description = "Explicitly start, read or stop a short-lived server chat monitor. Start requires 10-120 seconds and returns an epoch. Read requires that epoch and an optional sequence cursor; returns at most four untrusted messages, reports dropped records, and retains at most 64. Stop removes its own hook; the timer normally removes it on expiry. If another addon removes the timer, use stop. Requires reachable server Lua and appropriate authorization.",
+                        inputSchema = new { type = "object", properties = new { action = new { type = "string", @enum = new[] { "start", "read", "stop" } }, seconds = new { type = "integer", minimum = 10, maximum = 120 }, epoch = new { type = "string", minLength = 1, maxLength = 16 }, after_sequence = new { type = "integer", minimum = 0 }, limit = new { type = "integer", minimum = 1, maximum = 4 } }, required = new[] { "action" } },
+                        annotations = new { readOnlyHint = false, destructiveHint = true, idempotentHint = false, openWorldHint = true }
+                    },
+                    new
+                    {
+                        name = "hold_player",
+                        description = "Temporarily freeze one current human player for 1-15 seconds or release a hold created by this tool. Rejects players already frozen and overlapping holds; automatic release uses a server timer. Concurrent external freeze changes cannot be distinguished, and deleting the timer can prevent automatic release. Requires reachable server Lua and appropriate authorization.",
+                        inputSchema = new { type = "object", properties = new { user_id = new { type = "integer", minimum = 1 }, action = new { type = "string", @enum = new[] { "hold", "release" } }, seconds = new { type = "integer", minimum = 1, maximum = 15 } }, required = new[] { "user_id" } },
+                        annotations = new { readOnlyHint = false, destructiveHint = true, idempotentHint = false, openWorldHint = true }
                     },
                     new
                     {
@@ -950,6 +986,7 @@ GTerm drives Garry's Mod through its console command buffer. Live game operation
             return toolName switch
             {
                 "get_game_status" => await HandleGetGameStatus(arguments),
+                "inspect_server_state" or "inspect_lua_hooks" or "send_player_chat" or "hold_player" or "monitor_player_chat" => await HandleServerOperation(toolName, arguments),
                 "run_gmod_command" => await HandleRunGmodCommand(arguments),
                 "execute_lua_code" => await HandleExecuteLuaCode(arguments),
                 "validate_lua_syntax" => await HandleValidateLuaSyntax(arguments),
@@ -1280,6 +1317,25 @@ GTerm drives Garry's Mod through its console command buffer. Live game operation
             return Ok(outputText.ToString());
         }
 
+        private async Task<object> HandleServerOperation(string name, JObject? arguments)
+        {
+            string code;
+            try
+            {
+                code = name switch
+                {
+                    "inspect_server_state" => ServerOperations.Snapshot(),
+                    "inspect_lua_hooks" => ServerOperations.Hooks(arguments),
+                    "send_player_chat" => ServerOperations.Chat(arguments),
+                    "hold_player" => ServerOperations.Hold(arguments),
+                    "monitor_player_chat" => ServerChatMonitor.Build(arguments),
+                    _ => throw new ArgumentException("Unknown server operation.")
+                };
+            }
+            catch (ArgumentException ex) { return Err(ex.Message); }
+            // Keep the existing server-realm gate, serialization and Lua-error reporting.
+            return await HandleExecuteLuaCode(new JObject { ["realm"] = "server", ["code"] = code });
+        }
         private async Task<object> HandleExecuteLuaCode(JObject? arguments)
         {
             string? code = arguments?["code"]?.ToString();

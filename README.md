@@ -25,6 +25,10 @@ by Earu and remains available under its original MIT license; see [LICENSE](LICE
 
 For a separate Windows development-server installation using anonymous
 SteamCMD login, see [the isolated SteamCMD helper](tools/steamcmd/README.md).
+For local or private-LAN startup, Workshop configuration and agent connection
+guidance, see [the dedicated server guide](tools/dedicated/README.md).
+The [development tool notes](docs/development-tool-integrations.md) describe
+optional EEL, ULX, ULib and profiling references.
 Preparing the dedicated server does not establish a GTerm connection or change
 the owner's installed client.
 
@@ -86,8 +90,13 @@ GTerm includes an MCP (Model Context Protocol) server for AI agents such as Curs
 2. (Optional) Set `"MCPSecret"` for authentication
 3. Configure your MCP client to connect to `http://localhost:27513` (add `?secret=...` if using authentication)
 
+For operational guidance, see [AGENTS.md](AGENTS.md) and the [server workflow](docs/agent-bridge-server-workflow.md). Server tools require a reachable server realm.
+
 **Available Tools:**
 - `get_game_status` - Report whether GMod is connected, in a session, and which Lua realms can run code right now (map, gamemode, players). Works even while GMod is closed. Agents should call this first.
+- `inspect_server_state` / `inspect_lua_hooks` - Bounded server and hook observations, not CPU profiling.
+- `send_player_chat` / `monitor_player_chat` - Directed player chat and explicitly started, expiring chat observation.
+- `hold_player` - Temporarily hold and release a current player with a bounded timeout.
 - `run_gmod_command` - Execute a console command and capture its output
 - `execute_lua_code` - Execute Lua in a **required** realm (`server` or `client`).
 - `validate_lua_syntax` - Compile-check Lua with the game's own `CompileString` without executing it
@@ -153,7 +162,7 @@ local dedicated server, it discovers server-owned packages in the server
 realm and offers only their server-realm tools. That server uses a separate
 `local-dedicated` consent scope.
 
-Enabling is done manually in GTerm's console using `packages` in GTerm, or when the agent calls `request_tool_packages`. Consent is stored in `Config.json` next to the running GTerm executable, keyed by scope, package name and the package file's compiled-bytecode hash. The same accepted package is restored automatically when those values match; a changed package or scope requires another decision. Client-discovered remote packages use the server IPv4, listen servers and singleplayer use `local`, and a directly connected dedicated server uses `local-dedicated`. Each GTerm executable directory has its own configuration and remembered choices.
+Enabling is done manually in GTerm's console using `packages` in GTerm, or when the agent calls `request_tool_packages`. Consent is stored in `Config.json` next to the running GTerm executable, keyed by scope, package name and the package file's compiled-bytecode hash. The same accepted package is restored automatically when those values match; a changed package or scope requires another decision. Client-discovered remote packages use the server IPv4, listen servers and singleplayer use `local`, and a directly connected dedicated server uses `local-dedicated`. Each GTerm executable directory has its own configuration and remembered choices. An unanswered consent request returns a pending result after a short wait; the user may still decide in GTerm, and only that decision enables the tools.
 
 Build and publish seed `Config.json` only when the destination does not already have one, preserving settings and remembered consent across rebuilds. To check this with a disposable project and synthetic configuration, run `pwsh -NoProfile -File tests/ConfigPreservation.Tests.ps1`. Keep runtime configuration and secrets out of commits.
 

@@ -64,7 +64,7 @@ if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
         throw 'Server marker does not match this path, app or branch.'
     }
 }
-$children = if ($existing) { @(Get-ChildItem -LiteralPath $serverDir -Force) } else { @() }
+$children = @(if ($existing) { Get-ChildItem -LiteralPath $serverDir -Force })
 if (-not $marker -and $children.Count -gt 0) {
     throw 'Refusing a nonempty server directory without a matching lab marker.'
 }
@@ -84,6 +84,9 @@ if ($Action -eq 'Inspect') {
 }
 
 if (-not $PSCmdlet.ShouldProcess($serverDir, "Install or validate Garry's Mod dedicated server ($Branch)")) { return }
+# Do not update an active or hardlinked server tree; Inspect and WhatIf stay read-only.
+Import-Module (Join-Path $PSScriptRoot 'GmodUpdateSafety.psm1') -Force -ErrorAction Stop
+Assert-GmodUpdateSafe -ServerRoot $serverDir
 if (-not $existing) { New-Item -ItemType Directory -Path $serverDir | Out-Null }
 if (-not $marker) {
     [ordered]@{schema = $schema; appId = $appId; branch = $Branch; serverRoot = $serverDir} |

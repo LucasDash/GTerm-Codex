@@ -67,4 +67,22 @@ object noServerTools = Call(T("ToolPackages"), "RestrictForStatus", clientParse[
 Check(noServerTools.GetType().GetField("Item1")!.GetValue(noServerTools) == null, "client-only package is unusable on dedicated server");
 string serverCommand = (string)T("GameStatusProbe").GetField("ServerProbeCommand", flags)!.GetValue(null)!;
 Check(serverCommand.Length < 512, "server probe fits console command limit");
+object View(string target, string realm)
+{
+    object luaRealm = Enum.Parse(T("LuaRealm"), realm);
+    object tool = Activator.CreateInstance(T("ToolCapability"), flags, null, new object[] { "probe", target, "test", luaRealm }, null)!;
+    Array toolsArray = Array.CreateInstance(T("ToolCapability"), 1);
+    toolsArray.SetValue(tool, 0);
+    object cap = Activator.CreateInstance(T("PackageCapability"), flags, null, new object?[] { "agent_bridge", null, toolsArray }, null)!;
+    Array capsArray = Array.CreateInstance(T("PackageCapability"), 1);
+    capsArray.SetValue(cap, 0);
+    return Activator.CreateInstance(T("ToolPackagesView"), flags, null, new object[] { new[] { "agent_bridge" }, capsArray }, null)!;
+}
+string Detail(object status, object view) => (string)T("GameStatus").GetMethod("ToDetail", flags)!.Invoke(status, new[] { view })!;
+string remoteServerTool = Detail(remote, View("server", "Server"));
+Check(remoteServerTool.Contains("target: server; realm: server") && remoteServerTool.Contains("server-realm tools cannot run") && !remoteServerTool.Contains("server anyway"), "remote server-realm tools report unavailable");
+string remoteClientProxy = Detail(remote, View("server", "Client"));
+Check(remoteClientProxy.Contains("target: server; realm: client") && remoteClientProxy.Contains("availability is not guaranteed") && !remoteClientProxy.Contains("server-realm tools cannot run"), "client proxy is described without promising server access");
+string localServerTool = Detail(dedicated, View("server", "Server"));
+Check(localServerTool.Contains("target: server; realm: server") && !localServerTool.Contains("server-realm tools cannot run"), "reachable dedicated server is not marked unavailable");
 Console.WriteLine("All dedicated package checks passed.");

@@ -11,7 +11,7 @@ namespace GTerm.MCP
     /// <summary>One loaded lua/gterm_packages/{Name}.lua. Hash is sha256 of the file's compiled bytecode.</summary>
     internal sealed record PackageManifest(string Name, string? Description, string? Server, IReadOnlyList<PackageToolDef> Tools, string Hash);
 
-    internal sealed record ToolCapability(string Name, string Target, string Description);
+    internal sealed record ToolCapability(string Name, string Target, string Description, LuaRealm Realm);
     internal sealed record PackageCapability(string Name, string? Description, IReadOnlyList<ToolCapability> Tools);
 
     /// <summary>What the status header/detail needs to know, without owning state.</summary>
@@ -182,7 +182,7 @@ namespace GTerm.MCP
                 PackageCapability[] caps = this.Current.Values
                     .OrderBy(e => e.Manifest.Name, StringComparer.Ordinal)
                     .Select(e => new PackageCapability(e.Manifest.Name, e.Manifest.Description,
-                        e.Manifest.Tools.Select(t => new ToolCapability(t.Name, t.Target, t.Description)).ToArray()))
+                        e.Manifest.Tools.Select(t => new ToolCapability(t.Name, t.Target, t.Description, t.Realm)).ToArray()))
                     .ToArray();
                 return new ToolPackagesView(caps.Select(c => c.Name).ToArray(), caps);
             }
@@ -731,13 +731,24 @@ namespace GTerm.MCP
             if (prompt == null)
                 return (new RequestResult { Outcome = RequestOutcome.PromptBusy, Unusable = unusable, Blocked = blocked }, null);
 
-            // The prompt never times out, and the decision is applied by this task the moment the
-            // user answers, whether or not the caller is still waiting. We wait here for as long as
-            // the answer takes; if the MCP client gives up on the request first, the task keeps
-            // running and still enables what the user picked, so the next get_game_status sees it.
-            return (await ApplyDecisionAsync(prompt, status.Scope, candidates, unusable, blocked), null);
+            // Consent remains open until the user answers. MCP calls return promptly with
+            // Pending, while the background decision still applies only the user's choice.
+            Task<RequestResult> decision = ApplyDecisionAsync(prompt, status.Scope, candidates, unusable, blocked);
+            return (await WaitForDecisionAsync(decision, 500), null);
         }
 
+        internal static async Task<RequestResult> WaitForDecisionAsync(Task<RequestResult> decision, int waitMs)
+        {
+            if (await Task.WhenAny(decision, Task.Delay(waitMs)) == decision) return await decision;
+            _ = ObservePendingDecisionAsync(decision);
+            return new RequestResult { Outcome = RequestOutcome.Pending };
+        }
+
+        private static async Task ObservePendingDecisionAsync(Task<RequestResult> decision)
+        {
+            try { await decision; }
+            catch (Exception ex) { LocalLogger.WriteLine($"Tool package consent failed: {ex.Message}"); }
+        }
         private async Task<RequestResult> ApplyDecisionAsync(ConsentPrompt prompt, string scope, List<PackageManifest> candidates, List<(string, string)> unusable, List<string> blocked)
         {
             int[]? chosen = await prompt.WaitAsync();

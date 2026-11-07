@@ -5,7 +5,7 @@ directory containing the built `GTerm.dll`:
 
 ```powershell
 dotnet build GTerm.csproj
-dotnet run --project tests/DedicatedTarget.Tests -- "$((Resolve-Path ./bin/Debug/net10.0).Path)"
+dotnet run --project tests/DedicatedTarget.Tests -- "$((Resolve-Path ./bin/Debug/net10.0-windows).Path)"
 ```
 
 The test exercises multiple simultaneous CLI flags, case-preserving values,

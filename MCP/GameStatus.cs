@@ -211,16 +211,22 @@ namespace GTerm.MCP
                 {
                     sb.AppendLine($"  {cap.Name}{(string.IsNullOrEmpty(cap.Description) ? "" : ": " + cap.Description)}");
                     foreach (ToolCapability tool in cap.Tools)
-                        sb.AppendLine($"    - {tool.Name} [{tool.Target}]: {tool.Description}");
+                        sb.AppendLine($"    - {tool.Name} [target: {tool.Target}; realm: {tool.Realm.ToString().ToLowerInvariant()}]: {tool.Description}");
                 }
 
-                // Tie the capability to the gap: on a remote server the server realm is dead, but a
-                // server-targeting package tool reaches it anyway. This is the link the agent misses.
-                if (!this.ServerRealm.IsUsable && packages.Capabilities.Any(c => c.Tools.Any(t => t.Target.Contains("server"))))
+                // A target label describes intent, not the realm executing the package.
+                // A client proxy may reach a server through its own protocol; a server-realm
+                // tool cannot run when this GTerm endpoint has no server Lua realm.
+                if (!this.ServerRealm.IsUsable && packages.Capabilities.Any(c => c.Tools.Any(t => t.Realm == LuaRealm.Server)))
                 {
                     sb.AppendLine();
-                    sb.AppendLine("NOTE: the server realm is unreachable here, but the enabled tools marked [server] act on the");
-                    sb.AppendLine("server anyway; see each tool's description above for what it does.");
+                    sb.AppendLine("NOTE: server-realm tools cannot run through this endpoint while server Lua is unreachable.");
+                    sb.AppendLine("Use an authorized GTerm connection to the server; tool enablement alone does not create one.");
+                }
+                if (!this.ServerRealm.IsUsable && packages.Capabilities.Any(c => c.Tools.Any(t => t.Realm == LuaRealm.Client && t.Target.Contains("server", StringComparison.Ordinal))))
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("Client-realm tools targeting a server may use their own addon protocol; availability is not guaranteed.");
                 }
             }
 

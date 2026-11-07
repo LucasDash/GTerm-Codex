@@ -22,7 +22,7 @@ reparse points and nonempty unmarked destinations, and binds its marker to the
 canonical path, app ID and branch. A matching marker permits a later update;
 changing branch requires a different empty lab directory. The installer asks
 SteamCMD to validate the chosen branch and checks its success message and the
-game directory. It does not modify the Steam client installation. Review
+game directory. Before an actual install or update it conservatively refuses to proceed while a Source dedicated server is running, while a GMod process cannot be classified, or when the target contains hard links or reparse points. Process and file checks are point-in-time checks; keep servers stopped and prevent concurrent changes throughout SteamCMD. Inspect and WhatIf do not run the update safety scan. It does not modify the Steam client installation. Review
 SteamCMD's own output if the install fails.
 
 App 4020 is the **dedicated server**; installing its 64-bit branch does not
@@ -45,3 +45,16 @@ existing Steam client remains on its own installation and default port.
 
 References: [GMod dedicated server documentation](https://wiki.facepunch.com/gmod/Downloading_a_Dedicated_Server)
 and [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD).
+
+## Safety tests
+
+From the repository root on Windows, run the disposable updater checks with PowerShell 7:
+
+```powershell
+$repo = (Get-Location).Path
+pwsh -NoProfile -File ./tests/SteamCmdSafety.Tests/SteamCmdSafety.Tests.ps1 `
+  -ModulePath (Join-Path $repo 'tools/steamcmd/GmodUpdateSafety.psm1') `
+  -UpdaterPath (Join-Path $repo 'tools/steamcmd/Invoke-GmodServer.ps1')
+```
+
+These use temporary fixtures, including a hard link and junction, and a fake SteamCMD; they do not update an actual game server.
