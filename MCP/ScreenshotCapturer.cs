@@ -160,12 +160,13 @@ namespace GTerm.MCP
                 int srcW = image.Width;
                 int srcH = image.Height;
 
-                // Rectangle.Intersect is the only correct clamp here; hand-rolled min/max gets the
-                // fully-off-screen case wrong.
-                Rectangle requested = new(x, y, width, height);
-                Rectangle rect = Rectangle.Intersect(requested, new Rectangle(0, 0, srcW, srcH));
-
-                if (rect.Width <= 0 || rect.Height <= 0)
+                // The input coordinates are 32-bit, but their sum can overflow.
+                // Clamp both edges in 64-bit arithmetic before forming a Rectangle.
+                long left = Math.Clamp((long)x, 0L, srcW);
+                long top = Math.Clamp((long)y, 0L, srcH);
+                long right = Math.Clamp((long)x + width, 0L, srcW);
+                long bottom = Math.Clamp((long)y + height, 0L, srcH);
+                if (right <= left || bottom <= top)
                 {
                     return new RegionResult
                     {
@@ -176,6 +177,8 @@ namespace GTerm.MCP
                     };
                 }
 
+                Rectangle requested = new(x, y, width, height);
+                Rectangle rect = new((int)left, (int)top, (int)(right - left), (int)(bottom - top));
                 double scale = ComputeScale(rect.Width, rect.Height);
                 int outW = Math.Max(1, (int)Math.Round(rect.Width * scale));
                 int outH = Math.Max(1, (int)Math.Round(rect.Height * scale));
