@@ -30,8 +30,38 @@
 
   <ItemGroup>
     <None Update="Config.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
   </ItemGroup>
+
+  <!-- Runtime settings and package consent live beside the executable. Seed a
+       new output only once; later builds and publishes must preserve it. -->
+  <Target Name="SeedInitialBuildConfig" AfterTargets="Build"
+          Condition="'$(TargetDir)' != '' and Exists('$(MSBuildProjectDirectory)\Config.json') and !Exists('$(TargetDir)Config.json')">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Config.json" DestinationFiles="$(TargetDir)Config.json" />
+  </Target>
+
+  <Target Name="SeedInitialPublishConfig" AfterTargets="Publish"
+          Condition="'$(PublishDir)' != '' and Exists('$(MSBuildProjectDirectory)\Config.json') and !Exists('$(PublishDir)Config.json')">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Config.json" DestinationFiles="$(PublishDir)Config.json" />
+  </Target>
+
+  <!-- Previous builds tracked Config.json as disposable output. Remove just
+       that entry so upgrade cleanup and dotnet clean cannot delete consent. -->
+  <Target Name="PreserveRuntimeConfigFromBuildCleanup"
+          BeforeTargets="_CleanGetCurrentAndPriorFileWrites;CoreClean"
+          Condition="'$(TargetDir)' != '' and Exists('$(IntermediateOutputPath)$(CleanFile)')">
+    <ReadLinesFromFile File="$(IntermediateOutputPath)$(CleanFile)">
+      <Output TaskParameter="Lines" ItemName="_GTermPriorTrackedWrites" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <_GTermPriorTrackedWrites Remove="$(TargetDir)Config.json" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)$(CleanFile)"
+                      Lines="@(_GTermPriorTrackedWrites)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
 
 </Project>
