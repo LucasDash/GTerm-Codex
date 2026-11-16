@@ -42,11 +42,21 @@ catch (TargetInvocationException e) when (e.InnerException is ArgumentOutOfRange
 Type interop = app.GetType("GTerm.GmodInterop", true)!;
 MethodInfo configure = interop.GetMethod("ConfigureTargetRoot", BindingFlags.Static | BindingFlags.NonPublic)!;
 MethodInfo resolve = interop.GetMethod("TryGetGmodPath", BindingFlags.Static | BindingFlags.NonPublic)!;
+configure.Invoke(null, [null]);
+configure.Invoke(null, [""]);
+try { configure.Invoke(null, ["   "]); throw new Exception("accepted whitespace-only explicit root"); }
+catch (TargetInvocationException e) when (e.InnerException is ArgumentException) { }
+try { configure.Invoke(null, ["relative-server"]); throw new Exception("accepted relative explicit root"); }
+catch (TargetInvocationException e) when (e.InnerException is ArgumentException) { }
 try { configure.Invoke(null, [Path.Combine(fixture, "missing")]); throw new Exception("accepted invalid explicit root"); }
 catch (TargetInvocationException e) when (e.InnerException is ArgumentException) { }
 Directory.CreateDirectory(Path.Combine(fixture, "garrysmod", "lua", "includes"));
 File.WriteAllText(Path.Combine(fixture, "garrysmod", "lua", "includes", "init.lua"), "-- fixture");
 File.WriteAllText(Path.Combine(fixture, "srcds_console_win64.exe"), "");
+configure.Invoke(null, [fixture]);
+configure.Invoke(null, [""]);
+Check(interop.GetField("TargetRoot", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null) == null,
+    "empty root must clear explicit target");
 configure.Invoke(null, [fixture]);
 object?[] rootArgs = ["", false];
 Check((bool)resolve.Invoke(null, rootArgs)! && (string?)rootArgs[0] == fixture, "dedicated root");

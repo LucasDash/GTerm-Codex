@@ -33,7 +33,8 @@ namespace GTerm
         /// <summary>Select an explicitly managed server root. Invalid explicit roots never fall back to Steam.</summary>
         internal static void ConfigureTargetRoot(string? root)
         {
-            if (root == null) { TargetRoot = null; return; }
+            // Older release bundles used an empty string for automatic detection.
+            if (root == null || root.Length == 0) { TargetRoot = null; return; }
             if (string.IsNullOrWhiteSpace(root) || !Path.IsPathFullyQualified(root))
                 throw new ArgumentException("GmodRoot must be an absolute dedicated-server root.");
             string fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
