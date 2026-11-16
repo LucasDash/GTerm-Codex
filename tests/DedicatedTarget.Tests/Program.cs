@@ -88,9 +88,28 @@ int length = BitConverter.ToInt32(header);
 byte[] body = new byte[length];
 await client.GetStream().ReadExactlyAsync(body, timeout.Token);
 Check(Encoding.UTF8.GetString(body) == "status", "framed command over selected port");
+// A forged length must be rejected before allocating the announced payload.
+await client.GetStream().WriteAsync(new byte[] { 0xff, 0xff, 0xff, 0xff }, timeout.Token);
+Check(await client.GetStream().ReadAsync(new byte[1], timeout.Token) == 0, "oversized frame must disconnect");
+using TcpClient reconnected = await server.AcceptTcpClientAsync(timeout.Token);
+await reconnected.GetStream().WriteAsync(BitConverter.GetBytes(8 * 1024 * 1024 + 1), timeout.Token);
+Check(await reconnected.GetStream().ReadAsync(new byte[1], timeout.Token) == 0, "one-byte-over-limit frame must disconnect");
+using TcpClient afterOversized = await server.AcceptTcpClientAsync(timeout.Token);
+// Send a malformed short log; it should disconnect without preventing a later reconnect.
+await afterOversized.GetStream().WriteAsync(new byte[] { 1, 0, 0, 0, 0 }, timeout.Token);
+Check(await afterOversized.GetStream().ReadAsync(new byte[1], timeout.Token) == 0, "truncated log frame must disconnect");
+using TcpClient afterMalformed = await server.AcceptTcpClientAsync(timeout.Token);
+while (!(bool)listenerType.GetProperty("IsConnected")!.GetValue(listener)!)
+    await Task.Delay(10, timeout.Token);
+await (Task)write.Invoke(listener, ["status"])!;
+await afterMalformed.GetStream().ReadExactlyAsync(header, timeout.Token);
+length = BitConverter.ToInt32(header);
+body = new byte[length];
+await afterMalformed.GetStream().ReadExactlyAsync(body, timeout.Token);
+Check(Encoding.UTF8.GetString(body) == "status", "reconnect after malformed frame");
 File.Delete(Path.Combine(fixture, "srcds_console_win64.exe"));
 Directory.Delete(Path.Combine(fixture, "garrysmod", "lua", "includes"));
 Directory.Delete(Path.Combine(fixture, "garrysmod", "lua"));
 Directory.Delete(Path.Combine(fixture, "garrysmod"));
 Directory.Delete(fixture);
-Console.WriteLine("DEDICATED_TARGET_TESTS_PASS config, no-fallback, listener port and framing");
+Console.WriteLine("DEDICATED_TARGET_TESTS_PASS config, no-fallback, listener port, framing and reconnect");

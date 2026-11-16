@@ -4,6 +4,9 @@ It exposes the server console over a localhost TCP socket. The default port
 is 27514; set the game process's `GTERM_MODULE_PORT` to a decimal port from 1
 to 65535 to use a different port. Configure GTerm's `ModulePort` to match.
 GTerm connects to the module as a client.
+The module rejects command frames over 1 MiB; GTerm rejects incoming log
+frames over 8 MiB. An oversized frame closes the connection so the client can
+reconnect. This bounds allocations and does not authenticate either peer.
 **This fork provides both x86 and x64 compatible versions.**
 
 ## Compiling

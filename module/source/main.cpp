@@ -83,6 +83,8 @@ typedef int socket_t;
 // A per-process override lets a dedicated server and a local player coexist.
 static const uint16_t GTERM_DEFAULT_PORT = 27514;
 static const char* GTERM_HOST = "127.0.0.1";
+// Bound a peer's command frame before allocating its payload.
+static const uint32_t GTERM_MAX_COMMAND_BYTES = 1024 * 1024;
 
 static bool GetGTermModulePort(uint16_t& port)
 {
@@ -318,6 +320,8 @@ static void ServerThread()
 
 			if (length == 0)
 				continue;
+			if (length > GTERM_MAX_COMMAND_BYTES)
+				break;
 
 			std::vector<uint8_t> payload(length);
 			if (!RecvAll(client, payload.data(), length))
