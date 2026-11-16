@@ -12,6 +12,7 @@ namespace GTerm.Listeners
     {
         private const string HOST = "127.0.0.1";
         private const int RECONNECT_DELAY_MS = 1000;
+        private const uint MAX_LOG_FRAME_BYTES = 8 * 1024 * 1024;
         private readonly int Port;
 
         internal TcpLogListener(int port = 27514)
@@ -89,6 +90,8 @@ namespace GTerm.Listeners
                         await this.Stream.ReadExactlyAsync(header.AsMemory(0, 4));
                         uint length = (uint)(header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24));
                         if (length == 0) continue;
+                        if (length > MAX_LOG_FRAME_BYTES)
+                            throw new InvalidDataException("GTerm module log frame exceeds the maximum size.");
 
                         byte[] payload = new byte[length];
                         await this.Stream.ReadExactlyAsync(payload.AsMemory(0, (int)length));
