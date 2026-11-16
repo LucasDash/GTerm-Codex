@@ -15,8 +15,11 @@ for TCP mode.
 Windows can opt into a named pipe, `GTerm.Module.<port>`. The module creates it
 with an explicit DACL for the server process account and Local System, rejects
 remote clients, and uses `FILE_FLAG_FIRST_PIPE_INSTANCE` to reject a pre-existing
-endpoint. GTerm verifies the pipe server PID against the selected GMod process
-before marking the connection live or sending commands. There is no fallback
+endpoint. GTerm verifies that the pipe server PID belongs to a supported
+executable in the selected GMod installation before sending commands. With
+automatic selection it compares against the detected GMod executable path.
+Multiple processes may share that executable; the check does not distinguish
+them. There is no fallback
 to TCP if named-pipe mode is selected. GTerm sets `GTERM_MODULE_TRANSPORT` and
 `GTERM_MODULE_PORT` when it launches GMod; an externally launched server must
 inherit matching environment variables. GTerm can also select the transport
@@ -39,7 +42,11 @@ when that queue is full, so an operator must not treat logs as lossless.
   advisory warnings; this transport change does not update that dependency.
 - `tests/DedicatedTarget.Tests` passed in Release, including config parsing,
   named-pipe selection, no-fallback behavior,
-  port validation, framing, and reconnect checks.
+  port validation, framing, and reconnect checks. After the PID selection
+  fix, Windows process fixtures confirmed that two processes using the selected
+  `bin/win64/gmod.exe` are accepted, while same-named executables in a
+  different root or an unexpected nested directory are rejected. These are
+  disposable test processes, not a running GMod client.
 - `tests/ConfigPreservation.Tests.ps1` passed all eight checks.
 - `tests/ModuleTransport.Tests` managed checks passed for wrong-server-PID
   rejection, matching-server-PID acceptance, framed log and command handling,
@@ -62,6 +69,9 @@ when that queue is full, so an operator must not treat logs as lossless.
 - The known-good server on `192.168.1.102:28115` remained untouched. TCP mode
   remains covered by the existing loopback listener tests, not a fresh live
   GMod server test in this pass.
+- The PID selection fix was exercised by the process fixtures and managed pipe
+  listener checks. The isolated GMod UI test above preceded that fix; repeat it
+  with a real `bin/win64/gmod.exe` client for end-to-end coverage of the fix.
 
 ## Trust and deployment limits
 

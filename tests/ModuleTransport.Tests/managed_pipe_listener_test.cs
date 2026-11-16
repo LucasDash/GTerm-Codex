@@ -72,15 +72,13 @@ try
     int port = 27631 + (Environment.ProcessId % 1000);
     string pipeName = $"GTerm.Module.{port}";
     int validationCount = 0;
-    Func<int?> expectedServerPid = () =>
-        Interlocked.Increment(ref validationCount) == 1
-            ? Environment.ProcessId + 123456
-            : Environment.ProcessId;
+    Func<uint, bool> expectedServerPid = pid =>
+        Interlocked.Increment(ref validationCount) != 1 && pid == (uint)Environment.ProcessId;
 
     ConstructorInfo constructor = listenerType.GetConstructor(
         BindingFlags.Instance | BindingFlags.NonPublic,
         binder: null,
-        [typeof(int), transportType, typeof(Func<int?>)],
+        [typeof(int), transportType, typeof(Func<uint, bool>)],
         modifiers: null) ?? throw new InvalidOperationException("Could not locate listener constructor.");
     object listener = constructor.Invoke([port, pipeTransport, expectedServerPid]);
 

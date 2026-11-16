@@ -11,8 +11,8 @@ process's `GTERM_MODULE_TRANSPORT` to `windows_named_pipe` and GTerm's
 `ModuleTransport` to the same value. The pipe is named
 `GTerm.Module.<port>`, has a DACL for the game process's account and Local
 System, rejects remote clients, and uses `FILE_FLAG_FIRST_PIPE_INSTANCE` to
-refuse a pre-existing pipe. GTerm checks the pipe server PID against the
-selected GMod process before marking the connection live or sending commands.
+refuse a pre-existing pipe. GTerm checks that the pipe server PID belongs to a
+supported executable in the selected GMod installation before connecting.
 There is no fallback to TCP. The OS account running GMod and GTerm is trusted;
 other processes running as that same account and local administrators remain
 inside the trust boundary. Linux and macOS continue to use TCP in this

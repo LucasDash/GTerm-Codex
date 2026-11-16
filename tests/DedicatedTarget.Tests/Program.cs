@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
@@ -11,6 +12,11 @@ static void Check(bool result, string message)
 static object? FieldOrProperty(object target, string name)
 {
     return target.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(target);
+}
+if (args.Length == 1 && args[0] == "--fixture-child")
+{
+    await Task.Delay(TimeSpan.FromMinutes(2));
+    return;
 }
 if (args.Length != 1 || !Path.IsPathFullyQualified(args[0]) || !File.Exists(Path.Combine(args[0], "GTerm.dll")))
     throw new ArgumentException("Provide the absolute directory of a built GTerm.dll.");
@@ -66,6 +72,72 @@ object?[] rootArgs = ["", false];
 Check((bool)resolve.Invoke(null, rootArgs)! && (string?)rootArgs[0] == fixture, "dedicated root");
 object?[] exeArgs = ["", true];
 Check((bool)resolve.Invoke(null, exeArgs)! && ((string)exeArgs[0]!).EndsWith("srcds_console_win64.exe"), "dedicated executable");
+
+if (OperatingSystem.IsWindows())
+{
+    // Real disposable processes exercise the PID lookup and reject other roots
+    // and deeper directories even when their executable is also named gmod.exe.
+    string[] files = ["DedicatedTarget.Tests.dll", "DedicatedTarget.Tests.deps.json", "DedicatedTarget.Tests.runtimeconfig.json"];
+    Process Spawn(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        foreach (string file in files) File.Copy(Path.Combine(AppContext.BaseDirectory, file), Path.Combine(directory, file));
+        string executable = Path.Combine(directory, "gmod.exe");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "DedicatedTarget.Tests.exe"), executable);
+        ProcessStartInfo start = new(executable) { UseShellExecute = false, CreateNoWindow = true };
+        start.ArgumentList.Add("--fixture-child");
+        return Process.Start(start) ?? throw new Exception("could not start process fixture");
+    }
+    void Remove(string directory)
+    {
+        if (!Directory.Exists(directory)) return;
+        File.Delete(Path.Combine(directory, "gmod.exe"));
+        foreach (string file in files) File.Delete(Path.Combine(directory, file));
+        Directory.Delete(directory);
+    }
+
+    MethodInfo verifyProcess = interop.GetMethod("IsExpectedGmodProcess", BindingFlags.Static | BindingFlags.NonPublic)!;
+    MethodInfo isRunning = interop.GetMethod("IsGmodRunning", BindingFlags.Static | BindingFlags.NonPublic)!;
+    bool Verify(uint pid) => (bool)verifyProcess.Invoke(null, [pid])!;
+    string goodDir = Path.Combine(fixture, "bin", "win64");
+    string deepDir = Path.Combine(goodDir, "deeper");
+    string otherRoot = fixture + "-other";
+    string otherDir = Path.Combine(otherRoot, "bin", "win64");
+    Process? good = null, second = null, deep = null, other = null;
+    try
+    {
+        good = Spawn(goodDir);
+        ProcessStartInfo secondStart = new(Path.Combine(goodDir, "gmod.exe")) { UseShellExecute = false, CreateNoWindow = true };
+        secondStart.ArgumentList.Add("--fixture-child");
+        second = Process.Start(secondStart) ?? throw new Exception("could not start second process fixture");
+        deep = Spawn(deepDir);
+        other = Spawn(otherDir);
+        Check(!good.HasExited && !second.HasExited && !deep.HasExited && !other.HasExited, "process fixtures exited unexpectedly");
+        Check(Verify((uint)good.Id), "configured bin/win64/gmod.exe must be accepted");
+        Check(Verify((uint)second.Id), "multiple processes using the selected executable must be accepted");
+        Check((bool)isRunning.Invoke(null, null)!, "bin/win64/gmod.exe must be detected as running");
+        Check(!Verify((uint)deep.Id), "same-named executable in a deeper directory must be rejected");
+        Check(!Verify((uint)other.Id), "same-named executable in another root must be rejected");
+        Check(!Verify((uint)Environment.ProcessId), "unrelated process must be rejected");
+        Check(!Verify(0) && !Verify(uint.MaxValue), "invalid PIDs must be rejected");
+    }
+    finally
+    {
+        foreach (Process? child in new[] { good, second, deep, other })
+        {
+            if (child == null) continue;
+            if (!child.HasExited) child.Kill();
+            child.WaitForExit();
+            child.Dispose();
+        }
+        Remove(deepDir);
+        Remove(goodDir);
+        if (Directory.Exists(Path.Combine(fixture, "bin"))) Directory.Delete(Path.Combine(fixture, "bin"));
+        Remove(otherDir);
+        if (Directory.Exists(Path.Combine(otherRoot, "bin"))) Directory.Delete(Path.Combine(otherRoot, "bin"));
+        if (Directory.Exists(otherRoot)) Directory.Delete(otherRoot);
+    }
+}
 File.Delete(Path.Combine(fixture, "garrysmod", "lua", "includes", "init.lua"));
 object?[] goneArgs = ["", false];
 Check(!(bool)resolve.Invoke(null, goneArgs)! && (string?)goneArgs[0] == "", "invalidated root must not fall back");

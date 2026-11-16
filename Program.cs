@@ -52,7 +52,7 @@ namespace GTerm
 
             Config = new Config(args);
             GmodInterop.ConfigureTargetRoot(Config.GmodRoot);
-            Listener = new TcpLogListener(Config.ModulePort, Config.ModuleTransport, GmodInterop.GetGmodProcessId);
+            Listener = new TcpLogListener(Config.ModulePort, Config.ModuleTransport, GmodInterop.IsExpectedGmodProcess);
 
             Process? parent = curProc.GetParent();
             LocalLogger.WriteLine($"Parent process: {parent?.ProcessName}");

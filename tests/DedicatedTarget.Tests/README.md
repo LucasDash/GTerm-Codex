@@ -11,5 +11,7 @@ dotnet run --project tests/DedicatedTarget.Tests/DedicatedTarget.Tests.csproj -c
 
 The test exercises multiple simultaneous CLI flags, case-preserving values,
 explicit target validation and no-fallback behavior, and framed TCP commands on
-an ephemeral loopback port. It creates a unique temporary fake server layout;
-it does not start GTerm, Garry's Mod, or a dedicated server.
+an ephemeral loopback port. On Windows, disposable processes named `gmod.exe`
+also exercise PID checks for multiple processes in the supported `bin/win64`
+layout, an unrelated root, and an unexpected nested directory. It does not
+start GTerm, Garry's Mod, or a dedicated server.

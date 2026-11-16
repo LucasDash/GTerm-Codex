@@ -9,7 +9,7 @@ namespace GTerm.Listeners
 {
     // Connects to the module using the configured local transport. TCP remains
     // the compatibility default; the Windows named-pipe mode also checks the
-    // pipe server PID against the selected GMod process before sending commands.
+    // pipe server PID against the selected GMod installation before sending commands.
     internal class TcpLogListener : ILogListener
     {
         private const string HOST = "127.0.0.1";
@@ -18,7 +18,7 @@ namespace GTerm.Listeners
         private const uint MAX_LOG_FRAME_BYTES = 8 * 1024 * 1024;
         private readonly int Port;
         private readonly ModuleTransportKind Transport;
-        private readonly Func<int?> ExpectedPipeServerProcessId;
+        private readonly Func<uint, bool> IsExpectedPipeServerProcess;
         private readonly SemaphoreSlim WriteLock = new(1, 1);
 
         internal TcpLogListener(int port = 27514)
@@ -26,14 +26,14 @@ namespace GTerm.Listeners
         {
         }
 
-        internal TcpLogListener(int port, ModuleTransportKind transport, Func<int?>? expectedPipeServerProcessId)
+        internal TcpLogListener(int port, ModuleTransportKind transport, Func<uint, bool>? isExpectedPipeServerProcess)
         {
             if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException(nameof(port));
             if (transport == ModuleTransportKind.WindowsNamedPipe && !OperatingSystem.IsWindows())
                 throw new PlatformNotSupportedException("The Windows named-pipe module transport is available only on Windows.");
             this.Port = port;
             this.Transport = transport;
-            this.ExpectedPipeServerProcessId = expectedPipeServerProcessId ?? (() => null);
+            this.IsExpectedPipeServerProcess = isExpectedPipeServerProcess ?? (_ => false);
         }
 
         private TcpClient? Client;
@@ -100,8 +100,7 @@ namespace GTerm.Listeners
                         await this.PipeClient.ConnectAsync(1000);
                         if (!GetNamedPipeServerProcessId(this.PipeClient.SafePipeHandle, out uint serverPid))
                             throw new IOException($"Could not verify the named-pipe server process (Win32 error {Marshal.GetLastWin32Error()}).");
-                        int? expectedPid = this.ExpectedPipeServerProcessId();
-                        if (!expectedPid.HasValue || serverPid != (uint)expectedPid.Value)
+                        if (!this.IsExpectedPipeServerProcess(serverPid))
                             throw new UnauthorizedAccessException("The named-pipe server does not match the selected Garry's Mod process; connection rejected.");
                         this.Stream = this.PipeClient;
                     }
