@@ -126,6 +126,15 @@ GTerm drives Garry's Mod through its console command buffer. Live game operation
                 HttpListenerRequest request = context.Request;
                 HttpListenerResponse response = context.Response;
 
+                // HTTP.sys may accept requests sent to another local interface when
+                // their Host header matches localhost. Check the socket peer before
+                // handling any method, including OPTIONS, or reading the secret.
+                if (!HttpPeer.IsLoopback(request.RemoteEndPoint))
+                {
+                    await SendPlain(response, 403, "Forbidden");
+                    return;
+                }
+
                 response.AddHeader("Access-Control-Allow-Origin", "*");
                 response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
                 response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id, MCP-Protocol-Version");
