@@ -62,6 +62,12 @@ namespace GTerm
             while (!this.ShouldStop)
             {
                 HttpListenerContext listenerContext = await httpListener.GetContextAsync();
+                if (!HttpPeer.IsLoopback(listenerContext.Request.RemoteEndPoint))
+                {
+                    listenerContext.Response.StatusCode = 403;
+                    listenerContext.Response.Close();
+                    continue;
+                }
                 if (listenerContext.Request.IsWebSocketRequest)
                 {
                     // Verify client by checking the secret in query parameters

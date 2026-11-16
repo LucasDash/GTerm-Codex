@@ -92,6 +92,11 @@ GTerm includes an MCP (Model Context Protocol) server for AI agents such as Curs
 
 For operational guidance, see [AGENTS.md](AGENTS.md) and the [server workflow](docs/agent-bridge-server-workflow.md). Server tools require a reachable server realm.
 
+The MCP and WebSocket HTTP handlers accept requests only from loopback peers.
+This check is independent of their optional secrets; it does not authenticate
+GTerm's separate native module TCP connection or protect against other
+processes on the same host.
+
 **Available Tools:**
 - `get_game_status` - Report whether GMod is connected, in a session, and which Lua realms can run code right now (map, gamemode, players). Works even while GMod is closed. Agents should call this first.
 - `inspect_server_state` / `inspect_lua_hooks` - Bounded server and hook observations, not CPU profiling.
