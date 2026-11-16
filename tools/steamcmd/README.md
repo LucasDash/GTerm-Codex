@@ -38,6 +38,15 @@ the same port. Set the server process's `GTERM_MODULE_PORT` environment
 variable to that decimal port before launching it; an unset variable uses
 27514, and an invalid value prevents the module from loading. Set this on the
 server process rather than globally when the player client uses the default.
+For Windows local IPC, set GTerm's `ModuleTransport` to
+`windows_named_pipe` and set `GTERM_MODULE_TRANSPORT=windows_named_pipe` in the
+dedicated-server process environment before starting the server. GTerm also
+checks that the pipe server PID matches the selected GMod installation. The
+pipe DACL grants access to the server process's Windows account and Local
+System, and remote pipe clients are rejected. Run GTerm under an account that
+can connect to that pipe; processes running as the same account remain within
+the trusted boundary. This mode has no TCP fallback. It is not available on
+Linux or macOS in this revision.
 With an explicit root, GTerm resolves script and relay files
 only in that root and disables its automatic module/game-file installer.
 Stage the matching native module and server-side loader separately. The

@@ -1,4 +1,5 @@
 using GTerm.Extensions;
+using GTerm.Listeners;
 using Microsoft.Win32;
 using Spectre.Console;
 using System.Diagnostics;
@@ -12,6 +13,17 @@ namespace GTerm
         private const string GMOD_ID = "4000";
         private static string? TargetRoot;
 
+        private static string[] TargetExecutables => OperatingSystem.IsWindows()
+            ? ["srcds_console_win64.exe", "srcds_win64.exe", "srcds_console.exe", "srcds.exe", "bin/win64/gmod.exe", "gmod.exe"]
+            : ["srcds_run", "srcds", "gmod"];
+
+        private static bool IsTargetExecutable(string? executable, string root)
+        {
+            if (executable == null) return false;
+            StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            return TargetExecutables.Any(name => Path.GetFullPath(Path.Combine(root, name)).Equals(executable, comparison));
+        }
+
         private static Process? GetGmodProcess()
         {
             if (TargetRoot == null) return Process.GetProcessesByName("gmod").FirstOrDefault();
@@ -21,8 +33,7 @@ namespace GTerm
                 foreach (Process process in Process.GetProcessesByName(name))
                 {
                     string? executable = process.GetExecutablePath();
-                    if (executable != null && Path.GetDirectoryName(executable)?.Equals(
-                        TargetRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) == true)
+                    if (IsTargetExecutable(executable, TargetRoot))
                         return process;
                     process.Dispose();
                 }
@@ -48,6 +59,30 @@ namespace GTerm
         /// GTerm module has not connected yet", which need different advice.
         /// </summary>
         internal static bool IsGmodRunning() => GetGmodProcess() != null;
+
+        /// <summary>Verify the actual named-pipe server against the selected GMod installation.</summary>
+        internal static bool IsExpectedGmodProcess(uint processId)
+        {
+            if (processId == 0 || processId > int.MaxValue) return false;
+            try
+            {
+                using Process process = Process.GetProcessById((int)processId);
+                if (process.HasExited) return false;
+                string? executable = process.GetExecutablePath();
+                if (TargetRoot != null) return IsTargetExecutable(executable, TargetRoot);
+
+                // Auto-detection may find a browser subprocess before the game.
+                // Compare the actual server's executable with the selected image
+                // instead of requiring an arbitrary first process with that name.
+                using Process? selected = GetGmodProcess();
+                string? selectedExecutable = selected?.GetExecutablePath();
+                StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+                return executable != null && selectedExecutable != null && executable.Equals(selectedExecutable, comparison);
+            }
+            catch (ArgumentException) { return false; }
+            catch (InvalidOperationException) { return false; }
+            catch (System.ComponentModel.Win32Exception) { return false; }
+        }
 
         private static bool TryGetSteamVDFPath(out string vdfPath)
         {
@@ -177,10 +212,7 @@ namespace GTerm
                         return false;
                     }
                     if (!toBin) { gmodPath = TargetRoot; return true; }
-                    string[] names = OperatingSystem.IsWindows()
-                        ? ["srcds_console_win64.exe", "srcds_win64.exe", "srcds_console.exe", "srcds.exe", "bin/win64/gmod.exe", "gmod.exe"]
-                        : ["srcds_run", "srcds", "gmod"];
-                    foreach (string name in names)
+                    foreach (string name in TargetExecutables)
                     {
                         string candidate = Path.Combine(TargetRoot, name);
                         if (File.Exists(candidate)) { gmodPath = candidate; return true; }
@@ -431,18 +463,25 @@ namespace GTerm
         /// Launches gmod in textmode
         /// </summary>
         /// <returns></returns>
-        internal static bool StartGmod()
+        internal static bool StartGmod(ModuleTransportKind moduleTransport, int modulePort)
         {
             if (!TryGetGmodPath(out string gmodBinPath)) return false;
 
-            GmodProcess = Process.Start(new ProcessStartInfo
+            ProcessStartInfo startInfo = new()
             {
                 Arguments = "-textmode",
                 FileName = gmodBinPath,
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 WindowStyle = ProcessWindowStyle.Hidden,
-            });
+            };
+            startInfo.Environment["GTERM_MODULE_TRANSPORT"] = moduleTransport switch
+            {
+                ModuleTransportKind.WindowsNamedPipe => "windows_named_pipe",
+                _ => "tcp",
+            };
+            startInfo.Environment["GTERM_MODULE_PORT"] = modulePort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            GmodProcess = Process.Start(startInfo);
 
             if (GmodProcess == null) return false;
 

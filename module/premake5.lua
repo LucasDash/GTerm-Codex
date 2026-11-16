@@ -20,4 +20,4 @@ CreateWorkspace({name = "gterm"})
 			links({"pthread", "dl"})
 
 		filter("system:windows")
-			links({"ws2_32"})
+			links({"ws2_32", "advapi32"})

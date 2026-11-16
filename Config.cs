@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using GTerm.Extensions;
+using GTerm.Listeners;
 
 namespace GTerm
 {
@@ -26,6 +27,7 @@ namespace GTerm
         public string? Realm { get; set; }
         public string? GmodRoot { get; set; }
         public int? ModulePort { get; set; }
+        public string? ModuleTransport { get; set; }
 
         /// <summary>Tool packages the user accepted, written by GTerm itself (see MCP/ToolPackages.cs).</summary>
         public ToolPackageConsentEntry[]? ToolPackageConsent { get; set; }
@@ -75,6 +77,7 @@ namespace GTerm
         internal ModuleRealm ModuleRealm { get; set; } = ModuleRealm.Server;
         internal string? GmodRoot { get; set; }
         internal int ModulePort { get; set; } = 27514;
+        internal ModuleTransportKind ModuleTransport { get; set; } = ModuleTransportKind.Tcp;
 
         private static readonly object FileLock = new();
 
@@ -179,6 +182,9 @@ namespace GTerm
             this.ModulePort = cfg.ModulePort ?? 27514;
             if (this.ModulePort < 1 || this.ModulePort > 65535)
                 throw new ArgumentOutOfRangeException(nameof(cfg.ModulePort), "ModulePort must be between 1 and 65535.");
+            this.ModuleTransport = ParseModuleTransport(cfg.ModuleTransport);
+            if (this.ModuleTransport == ModuleTransportKind.WindowsNamedPipe && !OperatingSystem.IsWindows())
+                throw new PlatformNotSupportedException("The Windows named-pipe module transport is available only on Windows. No TCP fallback was attempted.");
 
             if (cfg.ExclusionPatterns != null)
             {
@@ -201,7 +207,8 @@ namespace GTerm
             LocalLogger.WriteLine("Skip module update: " + this.SkipModuleUpdate);
             LocalLogger.WriteLine("Module realm: " + this.ModuleRealm);
             LocalLogger.WriteLine("Explicit GMod root: " + (this.GmodRoot ?? "(auto)"));
-            LocalLogger.WriteLine("Module TCP port: " + this.ModulePort);
+            LocalLogger.WriteLine("Module endpoint port: " + this.ModulePort);
+            LocalLogger.WriteLine("Module transport: " + this.ModuleTransport);
             LocalLogger.WriteLine("Exclusion Patterns: \n", string.Join("\n", this.ExclusionPatterns.Select(r => r.ToString())));
         }
 
@@ -217,6 +224,19 @@ namespace GTerm
                 default:
                     LocalLogger.WriteLine($"Unknown module realm '{value}', expected CL or SV. Defaulting to SV");
                     return ModuleRealm.Server;
+            }
+        }
+
+        private static ModuleTransportKind ParseModuleTransport(string? value)
+        {
+            switch (value?.Trim().ToLowerInvariant())
+            {
+                case null or "" or "tcp":
+                    return ModuleTransportKind.Tcp;
+                case "windows_named_pipe":
+                    return ModuleTransportKind.WindowsNamedPipe;
+                default:
+                    throw new ArgumentException("ModuleTransport must be 'tcp' or 'windows_named_pipe'.");
             }
         }
 

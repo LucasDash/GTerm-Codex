@@ -1,12 +1,28 @@
-# gmsv\_gterm
+# gmsv_gterm
 A Garry's Mod module that provides an interface for external consoles (used by [GTerm](https://github.com/Earu/GTerm)).
-It exposes the server console over a localhost TCP socket. The default port
-is 27514; set the game process's `GTERM_MODULE_PORT` to a decimal port from 1
-to 65535 to use a different port. Configure GTerm's `ModulePort` to match.
-GTerm connects to the module as a client.
+
+The compatibility default exposes the server console over localhost TCP. The
+default port is 27514; set `GTERM_MODULE_PORT` to a decimal port from 1 to
+65535 and configure GTerm's `ModulePort` to match. GTerm connects to the
+module as a client. TCP mode does not authenticate either peer.
+
+On Windows, matching builds can instead use a named pipe. Set the game
+process's `GTERM_MODULE_TRANSPORT` to `windows_named_pipe` and GTerm's
+`ModuleTransport` to the same value. The pipe is named
+`GTerm.Module.<port>`, has a DACL for the game process's account and Local
+System, rejects remote clients, and uses `FILE_FLAG_FIRST_PIPE_INSTANCE` to
+refuse a pre-existing pipe. GTerm checks that the pipe server PID belongs to a
+supported executable in the selected GMod installation before connecting.
+There is no fallback to TCP. The OS account running GMod and GTerm is trusted;
+other processes running as that same account and local administrators remain
+inside the trust boundary. Linux and macOS continue to use TCP in this
+revision.
+
 The module rejects command frames over 1 MiB; GTerm rejects incoming log
 frames over 8 MiB. An oversized frame closes the connection so the client can
-reconnect. This bounds allocations and does not authenticate either peer.
+reconnect. In named-pipe mode, log frames are dropped when the 1 MiB pending
+queue is full so a client that stops reading does not block engine logging.
+These bounds do not authenticate TCP mode.
 **This fork provides both x86 and x64 compatible versions.**
 
 ## Compiling

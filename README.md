@@ -21,7 +21,11 @@ by Earu and remains available under its original MIT license; see [LICENSE](LICE
 - Launch the gterm executable.
 - Enjoy!
 
-*IMPORTANT NOTE: GTerm communicates with the gmod module over a localhost TCP socket (`127.0.0.1:27514`), so GTerm must run on the same host as the server. If you run your server inside a docker container or any other sandbox, run GTerm inside that same sandbox (or otherwise share the loopback interface).*
+GTerm and its module must run on the same host. The compatibility default is
+localhost TCP (`127.0.0.1:27514`); it is **unauthenticated** and should only be
+used on a trusted local machine. On Windows, matching builds can use an
+OS-checked named pipe instead; see [the transport setup](module/readme.md).
+Secure mode does not fall back to TCP.
 
 For a separate Windows development-server installation using anonymous
 SteamCMD login, see [the isolated SteamCMD helper](tools/steamcmd/README.md).
@@ -41,6 +45,21 @@ GTerm installs its module on startup. This can be tuned with launch arguments (o
 - `--skipmodule` - Do not drop the module binary into `garrysmod/lua/bin`.
 - `--skipmoduleupdate` - Keep an existing module binary instead of replacing it when it differs from the published one.
 - `--realm cl|sv` - Name the module binary for the client (`gmcl_gterm_*.dll`) or server (`gmsv_gterm_*.dll`, default) realm.
+- `--moduletransport tcp|windows_named_pipe` - Select the native transport. `tcp` is the backward-compatible default. `windows_named_pipe` is Windows-only and fails closed on unsupported platforms.
+
+The same options can be stored in `Config.json`, for example:
+
+```json
+{
+  "ModuleTransport": "windows_named_pipe",
+  "ModulePort": 27514
+}
+```
+
+Named-pipe mode is for GTerm and GMod on the same Windows host. It relies on
+Windows account permissions and process-ID verification; other processes
+running as the same account and local administrators remain trusted. TCP mode
+is unauthenticated. See [the transport design and validation status](module/OPERATOR-TRANSPORT-DESIGN.md).
 
 ## WebSocket API
 GTerm includes a WebSocket server for console streaming and command execution.
