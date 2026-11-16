@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../MCP/ConsoleHistory.cs" Link="ConsoleHistory.cs" />
+    <Compile Include="../../MCP/GTermSentinels.cs" Link="GTermSentinels.cs" />
+    <Compile Include="../../Listeners/ILogListener.cs" Link="ILogListener.cs" />
+    <Compile Include="../../Listeners/LogEventArgs.cs" Link="LogEventArgs.cs" />
+  </ItemGroup>
+</Project>
