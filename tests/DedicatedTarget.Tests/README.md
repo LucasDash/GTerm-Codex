@@ -4,8 +4,9 @@ Build GTerm, then run this no-dependency test executable with the absolute
 directory containing the built `GTerm.dll`:
 
 ```powershell
-dotnet build GTerm.csproj
-dotnet run --project tests/DedicatedTarget.Tests -- "$((Resolve-Path ./bin/Debug/net10.0).Path)"
+dotnet build GTerm.csproj -c Release
+dotnet run --project tests/DedicatedTarget.Tests/DedicatedTarget.Tests.csproj -c Release -- `
+  (Resolve-Path ./bin/Release/net10.0).Path
 ```
 
 The test exercises multiple simultaneous CLI flags, case-preserving values,

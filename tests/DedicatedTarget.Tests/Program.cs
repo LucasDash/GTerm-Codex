@@ -24,9 +24,10 @@ AssemblyLoadContext.Default.Resolving += (_, name) =>
 Assembly app = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(appDirectory, "GTerm.dll"));
 Type configType = app.GetType("GTerm.Config", true)!;
 ConstructorInfo configConstructor = configType.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(string[])], null)!;
-object config = configConstructor.Invoke([new string[] {"--GmodRoot", fixture, "--ModulePort", "27524", "--MCPPort", "27523", "--MCP", "1", "--skipmodule", "--skipgamefiles", "--skipmoduleupdate", "--MCPSecret", "MiXeD-Secret"}]);
+object config = configConstructor.Invoke([new string[] {"--GmodRoot", fixture, "--ModulePort", "27524", "--ModuleTransport", "WINDOWS_NAMED_PIPE", "--MCPPort", "27523", "--MCP", "1", "--skipmodule", "--skipgamefiles", "--skipmoduleupdate", "--MCPSecret", "MiXeD-Secret"}]);
 Check((string?)FieldOrProperty(config, "GmodRoot") == fixture, "CLI root must preserve exact case and spacing");
 Check((int)FieldOrProperty(config, "ModulePort")! == 27524, "module port");
+Check(FieldOrProperty(config, "ModuleTransport")!.ToString() == "WindowsNamedPipe", "module transport CLI parsing must be case insensitive");
 Check((int)FieldOrProperty(config, "MCPPort")! == 27523, "nullable MCP port");
 Check((string?)FieldOrProperty(config, "MCPSecret") == "MiXeD-Secret", "CLI secret case");
 Check((bool)FieldOrProperty(config, "MCP")!, "nullable MCP flag");
@@ -34,10 +35,13 @@ Check((bool)FieldOrProperty(config, "SkipModule")! && (bool)FieldOrProperty(conf
     && (bool)FieldOrProperty(config, "SkipModuleUpdate")!, "multiple skip flags");
 object disabledConfig = configConstructor.Invoke([new string[] {"--MCP", "false"}]);
 Check(!(bool)FieldOrProperty(disabledConfig, "MCP")!, "explicit false must not enable MCP");
+Check(FieldOrProperty(disabledConfig, "ModuleTransport")!.ToString() == "Tcp", "module transport defaults to legacy TCP");
 try { configConstructor.Invoke([new string[] {"--mcp", "unexpected"}]); throw new Exception("accepted invalid boolean"); }
 catch (TargetInvocationException e) when (e.InnerException is ArgumentException) { }
 try { configConstructor.Invoke([new string[] {"--moduleport", "0"}]); throw new Exception("accepted invalid module port"); }
 catch (TargetInvocationException e) when (e.InnerException is ArgumentOutOfRangeException) { }
+try { configConstructor.Invoke([new string[] {"--moduletransport", "fallback"}]); throw new Exception("accepted unknown module transport"); }
+catch (TargetInvocationException e) when (e.InnerException is ArgumentException) { }
 
 Type interop = app.GetType("GTerm.GmodInterop", true)!;
 MethodInfo configure = interop.GetMethod("ConfigureTargetRoot", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -112,4 +116,4 @@ Directory.Delete(Path.Combine(fixture, "garrysmod", "lua", "includes"));
 Directory.Delete(Path.Combine(fixture, "garrysmod", "lua"));
 Directory.Delete(Path.Combine(fixture, "garrysmod"));
 Directory.Delete(fixture);
-Console.WriteLine("DEDICATED_TARGET_TESTS_PASS config, no-fallback, listener port, framing and reconnect");
+Console.WriteLine("DEDICATED_TARGET_TESTS_PASS config, transport selection, no-fallback, listener port, framing and reconnect");

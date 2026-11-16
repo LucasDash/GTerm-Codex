@@ -1,4 +1,5 @@
 using GTerm.Extensions;
+using GTerm.Listeners;
 using Microsoft.Win32;
 using Spectre.Console;
 using System.Diagnostics;
@@ -48,6 +49,15 @@ namespace GTerm
         /// GTerm module has not connected yet", which need different advice.
         /// </summary>
         internal static bool IsGmodRunning() => GetGmodProcess() != null;
+
+        /// <summary>Current process hosting the selected GMod installation, used to verify named-pipe server identity.</summary>
+        internal static int? GetGmodProcessId()
+        {
+            using Process? process = GetGmodProcess();
+            if (process == null || process.HasExited) return null;
+            try { return process.Id; }
+            catch (InvalidOperationException) { return null; }
+        }
 
         private static bool TryGetSteamVDFPath(out string vdfPath)
         {
@@ -431,18 +441,25 @@ namespace GTerm
         /// Launches gmod in textmode
         /// </summary>
         /// <returns></returns>
-        internal static bool StartGmod()
+        internal static bool StartGmod(ModuleTransportKind moduleTransport, int modulePort)
         {
             if (!TryGetGmodPath(out string gmodBinPath)) return false;
 
-            GmodProcess = Process.Start(new ProcessStartInfo
+            ProcessStartInfo startInfo = new()
             {
                 Arguments = "-textmode",
                 FileName = gmodBinPath,
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 WindowStyle = ProcessWindowStyle.Hidden,
-            });
+            };
+            startInfo.Environment["GTERM_MODULE_TRANSPORT"] = moduleTransport switch
+            {
+                ModuleTransportKind.WindowsNamedPipe => "windows_named_pipe",
+                _ => "tcp",
+            };
+            startInfo.Environment["GTERM_MODULE_PORT"] = modulePort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            GmodProcess = Process.Start(startInfo);
 
             if (GmodProcess == null) return false;
 

@@ -52,7 +52,7 @@ namespace GTerm
 
             Config = new Config(args);
             GmodInterop.ConfigureTargetRoot(Config.GmodRoot);
-            Listener = new TcpLogListener(Config.ModulePort);
+            Listener = new TcpLogListener(Config.ModulePort, Config.ModuleTransport, GmodInterop.GetGmodProcessId);
 
             Process? parent = curProc.GetParent();
             LocalLogger.WriteLine($"Parent process: {parent?.ProcessName}");
@@ -100,7 +100,7 @@ namespace GTerm
 
             if (Config.StartAsGmod)
             {
-                if (!GmodInterop.StartGmod()) return;
+                if (!GmodInterop.StartGmod(Config.ModuleTransport, Config.ModulePort)) return;
             }
 
             ShowWaitingConnection();
